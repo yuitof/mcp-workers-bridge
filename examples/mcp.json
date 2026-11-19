@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "workers-bridge": {
+      "command": "/Users/owner/mcp-workers-bridge/.venv/bin/mcp-workers-bridge",
+      "args": []
+    }
+  }
+}
