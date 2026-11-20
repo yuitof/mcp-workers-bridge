@@ -2,19 +2,28 @@
 
 ![Workers Bridge MCP social preview](assets/workers-bridge-ogp-encyclopedia-dark.png)
 
-A standalone stdio MCP server for the Access-protected Cloudflare Workers bridge:
+This repository contains both halves of the Access-protected service bridge:
 
-- `service-bridge-workers`: direct HTTPS client with YouTube captions and authenticated watch history, X read operations, and authenticated Reddit listing/source operations.
+- `src/mcp_workers_bridge/`: the Python stdio MCP client.
+- `infra/service-bridge-workers/`: the Cloudflare Worker source, tests, build configuration, Terraform, and deployment runbook.
 
 The server does not contain Cloudflare Access secrets, AWS credentials, cookies, transcripts, or cache data.
 
-## Install
+## Repository setup
 
 ```bash
 cd /Users/owner/mcp-workers-bridge
 uv sync --system-certs --extra test
-.venv/bin/pytest -q
+npm --prefix infra/service-bridge-workers ci
 ```
+
+Run both test suites and the Worker build:
+
+```bash
+make check
+```
+
+Or run them separately with `make python-test`, `make worker-check`, `make worker-test`, `make worker-build`, and `make terraform-check`.
 
 ## Configuration
 
@@ -38,6 +47,21 @@ export REDDIT_STORAGE_STATE_JSON='...'
 In Codex Cloud, configure `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` as environment-owned HTTP secrets scoped to the exact Worker hostname. Keep the inherited HTTPS proxy active. On a local Mac, load the actual service-token values privately and exclude the Worker hostname from the local proxy only when your setup requires that route.
 
 The URL configuration accepts `SERVICE_BRIDGE_WORKER_URL` and the shorter `WORKERS_BRIDGE_URL` alias.
+
+## Worker service
+
+The Worker subproject includes fixed-target Gateway routing, signed-out caption diagnostics and relay, authenticated YouTube history operations, and allowlisted X/Reddit reads. Its local, acceptance, Terraform, and deployment instructions are in [infra/service-bridge-workers/README.md](infra/service-bridge-workers/README.md), with the HTTPS contract in [API.md](infra/service-bridge-workers/API.md).
+
+```bash
+npm --prefix infra/service-bridge-workers run check
+npm --prefix infra/service-bridge-workers test -- --run
+npm --prefix infra/service-bridge-workers run build
+terraform -chdir=infra/service-bridge-workers/terraform fmt -check
+terraform -chdir=infra/service-bridge-workers/terraform init -backend=false
+terraform -chdir=infra/service-bridge-workers/terraform validate
+```
+
+Deployment, Worker creation, Access changes, Terraform apply, and Gateway changes still require the approvals documented in the Worker runbook. The checked-in Wrangler configuration keeps diagnostics and relay routes disabled.
 
 ## MCP tools
 
