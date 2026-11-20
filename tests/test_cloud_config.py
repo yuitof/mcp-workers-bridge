@@ -41,6 +41,10 @@ def test_cloud_setup_installs_both_repository_components():
     assert "uv sync --system-certs --extra test" in setup
     assert "npm --prefix infra/service-bridge-workers ci" in setup
     assert "test -x .venv/bin/mcp-workers-bridge" in setup
+    assert 'export UV_CACHE_DIR="$setup_cache/uv"' in setup
+    assert 'export UV_PYTHON_INSTALL_DIR="$setup_cache/python"' in setup
+    assert 'export npm_config_cache="$setup_cache/npm"' in setup
+    assert "mktemp -d /tmp/mcp-workers-bridge-setup" in setup
     assert 'CODEX_HOME' in setup
     assert "configure_trust.py" in setup
 

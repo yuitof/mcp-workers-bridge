@@ -20,6 +20,11 @@ are ignored for untrusted projects. Trust registration replaces
 `config.toml` atomically, so an existing read-only file is supported when its
 containing Codex home directory is writable.
 
+Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
+npm, and XDG state. This avoids failures when Cloud mounts the home-directory
+cache read-only. Set `MCP_WORKERS_BRIDGE_SETUP_CACHE` to another writable
+absolute directory if `/tmp` is unavailable in your environment.
+
 ## Environment variables
 
 Add these ordinary environment variables:
