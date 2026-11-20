@@ -1,5 +1,7 @@
 # Workers Bridge MCP
 
+![Workers Bridge MCP social preview](assets/workers-bridge-ogp-encyclopedia-dark.png)
+
 A standalone stdio MCP server for the Access-protected Cloudflare Workers bridge:
 
 - `service-bridge-workers`: direct HTTPS client with YouTube captions and authenticated watch history, X read operations, and authenticated Reddit listing/source operations.
