@@ -1,4 +1,7 @@
 from pathlib import Path
+import stat
+import subprocess
+import sys
 import tomllib
 
 
@@ -38,5 +41,34 @@ def test_cloud_setup_installs_both_repository_components():
     assert "uv sync --system-certs --extra test" in setup
     assert "npm --prefix infra/service-bridge-workers ci" in setup
     assert "test -x .venv/bin/mcp-workers-bridge" in setup
-    assert 'trust_level = "trusted"' in setup
     assert 'CODEX_HOME' in setup
+    assert "configure_trust.py" in setup
+
+    trust = (ROOT / ".codex/configure_trust.py").read_text()
+    assert 'trust_level = "trusted"' in trust
+
+
+def test_cloud_trust_replaces_read_only_config(tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text(
+        '[model_providers.existing]\nname = "fixture"\n',
+        encoding="utf-8",
+    )
+    config.chmod(0o444)
+    project = tmp_path / "project"
+    project.mkdir()
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / ".codex/configure_trust.py"),
+            str(config),
+            str(project),
+        ],
+        check=True,
+    )
+
+    parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+    assert parsed["model_providers"]["existing"]["name"] == "fixture"
+    assert parsed["projects"][str(project)]["trust_level"] == "trusted"
+    assert stat.S_IMODE(config.stat().st_mode) == 0o600

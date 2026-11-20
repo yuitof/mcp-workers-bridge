@@ -16,7 +16,9 @@ The script installs the locked Python environment and Worker npm dependencies.
 It does not collect history, read cookies, invoke the Worker, or deploy
 infrastructure. It also marks the checked-out workspace as trusted in the
 persistent Cloud Codex home, because project-scoped `.codex/config.toml` files
-are ignored for untrusted projects.
+are ignored for untrusted projects. Trust registration replaces
+`config.toml` atomically, so an existing read-only file is supported when its
+containing Codex home directory is writable.
 
 ## Environment variables
 
@@ -102,3 +104,9 @@ Codex documentation warns that local MCP servers and transports may not be
 available on every Cloud execution path; in that case this local-process MCP
 cannot be attached through Cloud settings alone. Use local Codex or a
 streamable-HTTP MCP deployment instead.
+
+If setup reports that both atomic replacement and direct write failed, the
+entire persistent Codex home is mounted read-only. In that case the environment
+must provision the `[projects."/absolute/checkout/path"] trust_level = "trusted"`
+entry before the task starts, or expose the MCP through a supported remote
+transport. The repository setup script cannot change a read-only mount.
