@@ -10,6 +10,12 @@ def test_server_exposes_expected_tools():
     assert {tool.name for tool in tools} == {
         "bridge_configuration",
         "workers_bridge_probe",
+        "workers_reddit_comments",
+        "workers_reddit_identity",
+        "workers_reddit_listing",
+        "workers_x_asset",
+        "workers_x_graphql",
+        "workers_x_home",
         "legacy_bridge_probe",
         "workers_youtube_captions",
     }

@@ -1,8 +1,8 @@
 # Workers Bridge MCP
 
-A standalone stdio MCP server for the two service bridge implementations:
+A standalone stdio MCP server for the service bridge implementations:
 
-- `service-bridge-workers`: direct Access-protected HTTPS client with arbitrary public YouTube video IDs, Gateway egress checks, manual-caption preference, and automatic fallback.
+- `service-bridge-workers`: direct Access-protected HTTPS client with YouTube captions, X read operations, and authenticated Reddit listing/source operations.
 - `service-bridge`: optional compatibility probe that invokes the documented client in an existing `vault` checkout, preserving its AWS, built-in VPN, proxy, CA, and cache settings.
 
 The server does not contain Cloudflare Access secrets, AWS credentials, cookies, transcripts, or cache data.
@@ -26,6 +26,8 @@ export SERVICE_BRIDGE_WORKER_URL=https://service-bridge-workers.example.workers.
 export CF_ACCESS_CLIENT_ID=...
 export CF_ACCESS_CLIENT_SECRET=...
 export WORKERS_BRIDGE_TIMEOUT_SECONDS=50
+export X_STORAGE_STATE_JSON='...'
+export REDDIT_STORAGE_STATE_JSON='...'
 ```
 
 In Codex Cloud, configure `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` as environment-owned HTTP secrets scoped to the exact Worker hostname. Keep the inherited HTTPS proxy active. On a local Mac, load the actual service-token values privately and exclude the Worker hostname from the local proxy only when your setup requires that route.
@@ -57,9 +59,19 @@ The child process inherits the existing AWS identity, built-in VPN, proxy, CA, S
 | `bridge_configuration` | Reports configuration state without exposing credentials. |
 | `workers_bridge_probe` | Checks `/v1/health` and the Gateway public-IP endpoint through the Worker. |
 | `workers_youtube_captions` | Fetches one public video's English captions through the Worker. Manual captions are preferred and automatic captions are the fallback. |
+| `workers_x_home` | Fetches authenticated `x.com/home`. |
+| `workers_x_graphql` | Runs an allowlisted, read-only X GraphQL operation with caller-supplied authentication and transaction headers. |
+| `workers_x_asset` | Fetches an allowlisted X web-client JavaScript asset. |
+| `workers_reddit_identity` | Verifies the authenticated Reddit identity. |
+| `workers_reddit_listing` | Fetches one JSON listing page for upvoted, saved, or another supported collection. |
+| `workers_reddit_comments` | Fetches an authenticated Old Reddit post or comment page. |
 | `legacy_bridge_probe` | Runs the unsigned probe of the existing Lambda bridge through `VAULT_ROOT`. |
 
 `workers_youtube_captions` returns metadata and a segment count by default. Set `include_segments=true` to return caption text. `max_segments` limits the response to 20,000 segments.
+
+X and Reddit sessions load from `X_STORAGE_STATE_JSON` or `REDDIT_STORAGE_STATE_JSON`. If those direct variables are absent, the server reads their standard private files beneath `VAULT_ROOT/.codex/tmp/`. Cookies are placed in outbound request headers by the MCP process and are never returned in tool metadata.
+
+The Worker must be deployed with `RELAY_ENABLED=true`. Its relay exposes only fixed read-only operations. X GraphQL query IDs are dynamic, so `workers_x_graphql` accepts a query ID and supplies only the documented read-operation names, exact query keys, `x.com`, and fixed endpoint paths.
 
 ## Register with an MCP client
 

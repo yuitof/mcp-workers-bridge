@@ -7,6 +7,14 @@ from mcp.server.fastmcp import FastMCP
 from .config import LegacyConfig, WorkersConfig
 from .errors import BridgeError, ConfigurationError
 from .legacy import LegacyBridge
+from .social import (
+    reddit_comments,
+    reddit_identity,
+    reddit_listing,
+    x_asset,
+    x_graphql,
+    x_home,
+)
 from .workers import WorkersClient, error_result
 
 
@@ -106,6 +114,128 @@ def workers_youtube_captions(
 def legacy_bridge_probe() -> dict[str, Any]:
     try:
         return LegacyBridge(LegacyConfig.from_env()).probe()
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_x_home",
+    description=(
+        "Fetch the authenticated X home page through the Cloudflare Workers relay."
+    ),
+)
+def workers_x_home(
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 2_000_000,
+) -> dict[str, Any]:
+    try:
+        return x_home(_workers(), headers, max_bytes)
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_x_graphql",
+    description=(
+        "Perform an allowlisted read-only X GraphQL request through the Cloudflare "
+        "Workers relay. Authentication and transaction headers must be supplied."
+    ),
+)
+def workers_x_graphql(
+    query_id: str,
+    operation_name: str,
+    variables: dict[str, Any],
+    features: dict[str, Any],
+    field_toggles: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 4_000_000,
+) -> dict[str, Any]:
+    try:
+        return x_graphql(
+            _workers(),
+            query_id,
+            operation_name,
+            variables,
+            features,
+            field_toggles,
+            headers,
+            max_bytes,
+        )
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_x_asset",
+    description=(
+        "Fetch an allowlisted X web-client JavaScript asset through the Cloudflare "
+        "Workers relay without sending X cookies to the asset host."
+    ),
+)
+def workers_x_asset(
+    asset: str,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 4_000_000,
+) -> dict[str, Any]:
+    try:
+        return x_asset(_workers(), asset, headers, max_bytes)
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_reddit_identity",
+    description=(
+        "Verify and return the authenticated Reddit identity through the Cloudflare "
+        "Workers relay."
+    ),
+)
+def workers_reddit_identity(
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 1_000_000,
+) -> dict[str, Any]:
+    try:
+        return reddit_identity(_workers(), headers, max_bytes)
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_reddit_listing",
+    description=(
+        "Fetch one authenticated Old Reddit JSON listing page for an allowlisted "
+        "collection through the Cloudflare Workers relay."
+    ),
+)
+def workers_reddit_listing(
+    account: str,
+    collection: str,
+    after: str | None = None,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 8_000_000,
+) -> dict[str, Any]:
+    try:
+        return reddit_listing(
+            _workers(), account, collection, after, headers, max_bytes
+        )
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_reddit_comments",
+    description=(
+        "Fetch an authenticated Old Reddit post/comment page through the Cloudflare "
+        "Workers relay."
+    ),
+)
+def workers_reddit_comments(
+    permalink: str,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 12_000_000,
+) -> dict[str, Any]:
+    try:
+        return reddit_comments(_workers(), permalink, headers, max_bytes)
     except BridgeError as error:
         return error_result(error)
 

@@ -1,9 +1,11 @@
 """Access-protected Cloudflare Workers bridge client."""
 
 import ipaddress
+import json
 import os
 import platform
 import ssl
+from urllib.parse import unquote
 
 import requests
 
@@ -109,6 +111,64 @@ class WorkersClient:
             "segments": segments[:max_segments] if include_segments else [],
             "segments_truncated": include_segments and len(segments) > max_segments,
         }
+
+    def relay(
+        self,
+        service: str,
+        operation: str,
+        parameters: dict,
+        *,
+        query: str = "",
+        headers: dict[str, str] | None = None,
+        max_bytes: int = 2_000_000,
+    ):
+        response = self.request(
+            "POST",
+            f"/v1/relay/{service}/{operation}",
+            json={
+                "parameters": parameters,
+                "query": query,
+                "headers": headers or {},
+                "body": None,
+            },
+        )
+        try:
+            origin_status = response.headers.get("X-Origin-Http", "")
+            if not origin_status.isdecimal():
+                raise TransportError(
+                    "Worker relay returned an invalid upstream status."
+                )
+            raw = response.content[: max_bytes + 1]
+            truncated = len(raw) > max_bytes
+            raw = raw[:max_bytes]
+            content_type = response.headers.get("Content-Type", "application/octet-stream")
+            text = raw.decode("utf-8", errors="replace")
+            origin_code = int(origin_status)
+            result = {
+                "ok": 200 <= origin_code < 300,
+                "bridge_ok": True,
+                "service": service,
+                "operation": operation,
+                "upstream_http": origin_code,
+                "content_type": content_type,
+                "body": text,
+                "body_truncated": truncated,
+                "_set_cookies": [
+                    unquote(value.strip())
+                    for value in response.headers.get("X-Origin-Set-Cookie", "").split(",")
+                    if value.strip()
+                ],
+            }
+            if not result["ok"]:
+                result["error"] = "upstream_http"
+        finally:
+            response.close()
+        if "json" in content_type.lower() and not truncated:
+            try:
+                result["json"] = json.loads(result["body"])
+            except ValueError:
+                pass
+        return result
 
 
 def error_result(error: BridgeError):

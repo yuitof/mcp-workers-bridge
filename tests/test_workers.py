@@ -103,6 +103,21 @@ def test_access_denial_is_classified_before_worker(monkeypatch):
             client.probe()
 
 
+def test_relay_preserves_upstream_denial_as_structured_result(monkeypatch):
+    reply = response(
+        "blocked",
+        **{"X-Bridge-Version": "1", "X-Origin-Http": "403", "Content-Type": "text/html"},
+    )
+    with WorkersClient(config()) as client:
+        monkeypatch.setattr(client.session, "request", lambda *args, **kwargs: reply)
+        result = client.relay("reddit", "home", {})
+    assert result["bridge_ok"] is True
+    assert result["ok"] is False
+    assert result["error"] == "upstream_http"
+    assert result["upstream_http"] == 403
+    assert result["body"] == "blocked"
+
+
 @pytest.mark.parametrize("video_id", ["short", "AAAAAAAAAAAA", "bad/id12345", ""])
 def test_invalid_video_id_is_rejected(monkeypatch, video_id):
     with WorkersClient(config()) as client:
