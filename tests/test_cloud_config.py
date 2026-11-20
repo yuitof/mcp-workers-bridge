@@ -31,6 +31,9 @@ def test_project_mcp_forwards_required_cloud_environment():
         "YOUTUBE_CACHE_DIR",
         "YOUTUBE_CACHE_BUCKET",
         "AWS_REGION",
+        "AWS_PROFILE",
+        "AWS_CONFIG_FILE",
+        "AWS_SHARED_CREDENTIALS_FILE",
         "HTTPS_PROXY",
         "SSL_CERT_FILE",
     } <= forwarded

@@ -41,6 +41,13 @@ AWS_REGION=us-west-1
 still use the task-local cache, and Workers MCP calls can explicitly pass
 `use_cache=false`.
 
+Codex Cloud's AWS OIDC integration may expose a selected `AWS_PROFILE` whose
+definition lives in files referenced by `AWS_CONFIG_FILE` and
+`AWS_SHARED_CREDENTIALS_FILE`. All three variables must be forwarded to the MCP
+child process; forwarding only `AWS_PROFILE` causes boto3 to report that the
+profile cannot be found. Do not copy the contents of those files into the
+repository or environment documentation.
+
 ## Private values
 
 Add the Cloudflare Access pair as HTTP secrets, each allowed for:
