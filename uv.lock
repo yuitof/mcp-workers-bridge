@@ -40,6 +40,19 @@ wheels = [
 ]
 
 [[package]]
+name = "beautifulsoup4"
+version = "4.14.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "soupsieve" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/b0/1c6a16426d389813b48d95e26898aff79abbde42ad353958ad95cc8c9b21/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86", size = 627737, upload-time = "2025-11-30T15:08:26.084Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/39/47f9197bdd44df24d67ac8893641e16f386c984a0619ef2ee4c51fbbc019/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb", size = 107721, upload-time = "2025-11-30T15:08:24.087Z" },
+]
+
+[[package]]
 name = "boto3"
 version = "1.42.0"
 source = { registry = "https://pypi.org/simple" }
@@ -509,13 +522,15 @@ wheels = [
 
 [[package]]
 name = "mcp-workers-bridge"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
+    { name = "beautifulsoup4" },
     { name = "boto3" },
     { name = "defusedxml" },
     { name = "mcp" },
     { name = "requests" },
+    { name = "xclienttransaction" },
 ]
 
 [package.optional-dependencies]
@@ -525,11 +540,13 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", specifier = "==4.14.3" },
     { name = "boto3", specifier = "==1.42.0" },
     { name = "defusedxml", specifier = "==0.7.1" },
     { name = "mcp", specifier = "==1.30.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = "==9.2.0" },
     { name = "requests", specifier = "==2.34.2" },
+    { name = "xclienttransaction", specifier = "==1.0.3" },
 ]
 provides-extras = ["test"]
 
@@ -946,6 +963,15 @@ wheels = [
 ]
 
 [[package]]
+name = "soupsieve"
+version = "4.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/35/bf779c1cc376bc216a2d94e3b3d9ee48347296af29bedfc6caaf96bc132f/soupsieve-4.1.2.tar.gz", hash = "sha256:c6539a2638f26991463527337e39d630e3cbb86d024f52282a510535b8a7e09f", size = 178884, upload-time = "2026-11-18T17:21:03.858Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/33/f5082b3c480db024453077592057200955aed2a376327b8921d553404ca7/soupsieve-4.1.2-py3-none-any.whl", hash = "sha256:96b4115212a3abee1f572d62da706cca090b088cb5effa278db5702122e63a2c", size = 59295, upload-time = "2026-11-18T17:21:02.593Z" },
+]
+
+[[package]]
 name = "sse-starlette"
 version = "3.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1012,4 +1038,16 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/da/34/30e9280707135d2cfc589dfff3cb796bd07a3aeb1a3e415ba09dd89d7bb4/uvicorn-0.54.0.tar.gz", hash = "sha256:a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620", size = 112283, upload-time = "2026-09-25T06:52:37.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl", hash = "sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf", size = 87427, upload-time = "2026-09-25T06:52:35.829Z" },
+]
+
+[[package]]
+name = "xclienttransaction"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beautifulsoup4" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1b/11/6f5a55df6d464fe6f839fe96c3863fa2338005ed8e83e89b0a9db5716b5a/xclienttransaction-1.0.3.tar.gz", hash = "sha256:1eeb5d48cec6a224189bbd8a6021c40486fa3aff650478672bccf82b3436cedc", size = 10609, upload-time = "2026-06-26T10:47:39.664Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/a1/be735112ebe49916065e6f80017b93e92fc8880789c3f4f17380db7f531a/xclienttransaction-1.0.3-py3-none-any.whl", hash = "sha256:f73dd2a4b6856f98fa45f0cd26c9a0fdc0b2ceba0e79b5523cdf8aac7efc59fe", size = 10778, upload-time = "2026-06-26T10:47:38.401Z" },
 ]

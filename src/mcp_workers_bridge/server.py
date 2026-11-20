@@ -17,6 +17,7 @@ from .social import (
 from .youtube_history import youtube_history
 from .youtube_cache import CacheManager
 from .workers import WorkersClient, error_result
+from .x_collections import collect_x_collection
 
 
 mcp = FastMCP(
@@ -214,6 +215,66 @@ def workers_x_asset(
         return x_asset(_workers(), asset, headers, max_bytes)
     except BridgeError as error:
         return error_result(error)
+
+
+def _workers_x_collection(
+    collection: str,
+    max_pages: int,
+    cursor: str | None,
+    count: int,
+) -> dict[str, Any]:
+    if not 1 <= max_pages <= 200:
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "max_pages must be between 1 and 200.",
+        }
+    if not 1 <= count <= 100:
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "count must be between 1 and 100.",
+        }
+    try:
+        return collect_x_collection(
+            _workers(),
+            collection,
+            max_pages=max_pages,
+            cursor=cursor,
+            count=count,
+        )
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="workers_x_likes",
+    description=(
+        "Discover the current X GraphQL operation and transaction headers, verify "
+        "the Viewer identity, and collect authenticated Likes with cursor pagination."
+    ),
+)
+def workers_x_likes(
+    max_pages: int = 20,
+    cursor: str | None = None,
+    count: int = 100,
+) -> dict[str, Any]:
+    return _workers_x_collection("likes", max_pages, cursor, count)
+
+
+@mcp.tool(
+    name="workers_x_bookmarks",
+    description=(
+        "Discover the current X GraphQL operation and transaction headers, verify "
+        "the Viewer identity, and collect authenticated Bookmarks with cursor pagination."
+    ),
+)
+def workers_x_bookmarks(
+    max_pages: int = 20,
+    cursor: str | None = None,
+    count: int = 100,
+) -> dict[str, Any]:
+    return _workers_x_collection("bookmarks", max_pages, cursor, count)
 
 
 @mcp.tool(

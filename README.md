@@ -207,6 +207,8 @@ To verify Access from Codex Cloud, run the acceptance script in the Cloud outer 
 | `workers_youtube_captions` | Fetches one public video's English captions through the Worker. Manual captions are preferred and automatic captions are the fallback. |
 | `workers_youtube_history` | Retrieves authenticated account watch history through Workers, supports cache-only reads, and persists a vault-compatible local/S3 index. |
 | `workers_x_home` | Fetches authenticated `x.com/home`. |
+| `workers_x_likes` | Discovers the current X read operation, verifies the Viewer identity, and collects authenticated Likes with cursor pagination. |
+| `workers_x_bookmarks` | Discovers the current X read operation, verifies the Viewer identity, and collects authenticated Bookmarks with cursor pagination. |
 | `workers_x_graphql` | Runs an allowlisted, read-only X GraphQL operation with caller-supplied authentication and transaction headers. |
 | `workers_x_asset` | Fetches an allowlisted X web-client JavaScript asset. |
 | `workers_reddit_identity` | Verifies the authenticated Reddit identity. |
@@ -218,6 +220,8 @@ To verify Access from Codex Cloud, run the acceptance script in the Cloud outer 
 `workers_youtube_history` defaults to `refresh=true`, `use_cache=true`, the preceding 30 days, and 100 continuation pages. Set `refresh=false` for a cache-only read or `use_cache=false` to disable caching. Pass `since` as `YYYY-MM-DD`, override `timezone` with an IANA name such as `Europe/London`, or set `max_pages`.
 
 The tool returns normalized `video_id`, title, channel, URL, watch dates, transcript status, coverage metadata, and cache status. Incomplete pagination is reported as a partial result rather than an empty history.
+
+`workers_x_likes` and `workers_x_bookmarks` read the session from `X_STORAGE_STATE_JSON`, discover the current query IDs and transaction bundle from X's authenticated web build, verify that the GraphQL Viewer matches the home-page account, and return normalized post metadata and text. `max_pages` accepts 1–200 and `count` accepts 1–100. A page limit, repeated cursor, or malformed response is returned as an incomplete result with `next_cursor` when available; it is never reported as an empty collection. Resume by passing that value as `cursor`.
 
 Example cache-only Workers read:
 

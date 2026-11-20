@@ -4,15 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-workers-bridge"
-version = "0.4.0"
+version = "0.5.0"
 description = "MCP client and Cloudflare Worker setup for service bridge reads"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "beautifulsoup4==4.14.3",
   "boto3==1.42.0",
   "defusedxml==0.7.1",
   "mcp==1.30.0",
   "requests==2.34.2",
+  "xclienttransaction==1.0.3",
 ]
 
 [project.optional-dependencies]

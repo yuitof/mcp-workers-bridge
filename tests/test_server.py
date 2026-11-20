@@ -14,8 +14,10 @@ def test_server_exposes_expected_tools():
         "workers_reddit_identity",
         "workers_reddit_listing",
         "workers_x_asset",
+        "workers_x_bookmarks",
         "workers_x_graphql",
         "workers_x_home",
+        "workers_x_likes",
         "workers_youtube_captions",
         "workers_youtube_history",
     }
