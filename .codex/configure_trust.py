@@ -9,6 +9,7 @@ import re
 import stat
 import sys
 import tempfile
+import tomllib
 
 
 def updated_config(current: str, root: str) -> str:
@@ -80,19 +81,29 @@ def write_updated_config(config: Path, content: str) -> None:
         ) from None
 
 
+def is_trusted(current: str, project: str) -> bool:
+    try:
+        settings = tomllib.loads(current)
+    except tomllib.TOMLDecodeError:
+        return False
+    projects = settings.get("projects", {})
+    entry = projects.get(project, {}) if isinstance(projects, dict) else {}
+    return isinstance(entry, dict) and entry.get("trust_level") == "trusted"
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         raise SystemExit("usage: configure_trust.py CONFIG PROJECT_ROOT")
     config = Path(sys.argv[1])
     root = str(Path(sys.argv[2]).resolve())
     current = config.read_text(encoding="utf-8") if config.exists() else ""
-    updated = updated_config(current, root)
-    if config.exists() and updated == current:
+    if is_trusted(current, root):
         try:
             config.chmod(0o600)
         except OSError:
             pass
         return
+    updated = updated_config(current, root)
     write_updated_config(config, updated)
 
 
