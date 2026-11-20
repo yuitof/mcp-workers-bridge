@@ -134,5 +134,5 @@ def test_x_asset_never_returns_origin_cookies(monkeypatch):
             }
 
     monkeypatch.setattr(social, "WorkersClient", Client)
-    result = social.x_asset(CONFIG, "ondemand.synthetic.js")
+    result = social.x_asset(CONFIG, "main.synthetic.js")
     assert "auth_token=must-not-escape" not in str(result)

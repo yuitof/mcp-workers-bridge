@@ -213,7 +213,7 @@ def x_asset(
     headers: dict[str, str] | None = None,
     max_bytes: int = 4_000_000,
 ):
-    if not re.fullmatch(r"(?:bundle|shared~|ondemand)[A-Za-z0-9._~-]{1,160}\.js", asset):
+    if not re.fullmatch(r"(?:main|bundle|shared~|ondemand)[A-Za-z0-9._~-]{1,160}\.js", asset):
         raise BridgeError("invalid_argument", "Invalid X client asset name.")
     request_headers = _x_headers(headers)
     request_headers.pop("Cookie", None)

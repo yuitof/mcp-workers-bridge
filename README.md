@@ -73,6 +73,17 @@ X and Reddit sessions load from `X_STORAGE_STATE_JSON` or `REDDIT_STORAGE_STATE_
 
 The Worker must be deployed with `RELAY_ENABLED=true`. Its relay exposes only fixed read-only operations. X GraphQL query IDs are dynamic, so `workers_x_graphql` accepts a query ID and supplies only the documented read-operation names, exact query keys, `x.com`, and fixed endpoint paths.
 
+## Live acceptance
+
+The deployed Worker and MCP client passed read-only checks for:
+
+- YouTube manual captions for `aircAruvnKk`
+- Authenticated X home and `Viewer` GraphQL
+- The main X web-client JavaScript bundle
+- Reddit identity, upvoted and saved listings, and one comments page
+
+The live tests used private sessions from the local `vault` checkout. Tool results omitted cookie values and source contents from logs.
+
 ## Register with an MCP client
 
 After `uv sync`, use the absolute executable:
