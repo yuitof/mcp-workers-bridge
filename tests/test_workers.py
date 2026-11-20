@@ -32,6 +32,14 @@ def config():
     )
 
 
+def test_client_can_close_explicitly(monkeypatch):
+    client = WorkersClient(config())
+    closed = []
+    monkeypatch.setattr(client.session, "close", lambda: closed.append(True))
+    client.close()
+    assert closed == [True]
+
+
 def player(video_id, automatic=False):
     track = {
         "languageCode": "en",

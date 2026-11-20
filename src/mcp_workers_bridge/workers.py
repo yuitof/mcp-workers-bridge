@@ -30,6 +30,9 @@ class WorkersClient:
         return self
 
     def __exit__(self, *args):
+        self.close()
+
+    def close(self):
         self.session.close()
 
     def request(self, method: str, path: str, **kwargs):
