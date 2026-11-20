@@ -63,6 +63,137 @@ terraform -chdir=infra/service-bridge-workers/terraform validate
 
 Deployment, Worker creation, Access changes, Terraform apply, and Gateway changes still require the approvals documented in the Worker runbook. The checked-in Wrangler configuration keeps diagnostics and relay routes disabled.
 
+### Deploy the Worker
+
+Use Node 22.12+, 24, or 26+ and Terraform 1.7+. Authenticate Wrangler with a token that can write Workers:
+
+```bash
+cd /Users/owner/mcp-workers-bridge/infra/service-bridge-workers
+export CLOUDFLARE_ACCOUNT_ID="<account ID>"
+export CLOUDFLARE_API_TOKEN="<deployment token>"
+
+npm ci
+npm run check
+npm test
+npm run build
+npx wrangler whoami
+```
+
+For a new Worker, deploy the checked-in safe configuration first. It creates no public URL and keeps every route disabled:
+
+```bash
+npx wrangler deploy
+```
+
+Record the deployment ID privately. Use a read-only Cloudflare token with Worker and Access read permissions to obtain the stable Worker ID:
+
+```bash
+export CLOUDFLARE_API_TOKEN="<read-only inspection token>"
+npm run inspect
+```
+
+The Worker must exist before Terraform creates its Access application. Keep variables, plans, and state outside the repository:
+
+```bash
+export BRIDGE_STATE_DIR="$HOME/.private/service-bridge-workers"
+mkdir -p "$BRIDGE_STATE_DIR"
+chmod 700 "$BRIDGE_STATE_DIR"
+
+cp terraform/account.tfvars.example "$BRIDGE_STATE_DIR/account.tfvars"
+chmod 600 "$BRIDGE_STATE_DIR/account.tfvars"
+```
+
+Set the real `account_id` and `worker_id` in that private variables file. Review the complete Terraform plan before applying:
+
+```bash
+terraform -chdir=terraform init -backend=false
+
+terraform -chdir=terraform plan \
+  -state="$BRIDGE_STATE_DIR/terraform.tfstate" \
+  -var-file="$BRIDGE_STATE_DIR/account.tfvars" \
+  -out="$BRIDGE_STATE_DIR/access.tfplan"
+
+terraform -chdir=terraform show \
+  -no-color "$BRIDGE_STATE_DIR/access.tfplan"
+```
+
+After approval, apply that reviewed plan:
+
+```bash
+terraform -chdir=terraform apply \
+  -input=false \
+  -state="$BRIDGE_STATE_DIR/terraform.tfstate" \
+  "$BRIDGE_STATE_DIR/access.tfplan"
+```
+
+Store the sensitive Terraform outputs directly in a private secret manager or environment configuration. Do not print or commit them:
+
+```text
+service_token_client_id
+service_token_client_secret
+```
+
+Create the ignored private deployment profile from `wrangler.jsonc`:
+
+```bash
+cp wrangler.jsonc wrangler.acceptance.local.jsonc
+```
+
+First deploy an Access-test profile. In the copied configuration, change these fields while leaving diagnostics and relays disabled:
+
+```json
+{
+  "workers_dev": true,
+  "preview_urls": true,
+  "vars": {
+    "DIAGNOSTICS_ENABLED": "false",
+    "COMPARISON_ENABLED": "false",
+    "RELAY_ENABLED": "false"
+  }
+}
+```
+
+Deploy it and test the production and version-preview URLs:
+
+```bash
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+
+export SERVICE_BRIDGE_WORKER_URL="https://service-bridge-workers.<subdomain>.workers.dev"
+export SERVICE_BRIDGE_WORKER_PREVIEW_URL="<exact version preview URL>"
+export CF_ACCESS_CLIENT_ID="<from Terraform output>"
+export CF_ACCESS_CLIENT_SECRET="<from Terraform output>"
+
+npm run acceptance -- access
+```
+
+Missing and invalid credentials must be denied; valid credentials must reach the Worker. Then set `vars.DIAGNOSTICS_ENABLED` to `"true"` in the private configuration, redeploy, and verify Gateway egress and captions:
+
+```bash
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+npm run acceptance -- egress
+npm run acceptance -- captions
+```
+
+Finally restore `"DIAGNOSTICS_ENABLED": "false"`, set `"preview_urls": false`, and enable the operational routes:
+
+```json
+{
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "DIAGNOSTICS_ENABLED": "false",
+    "COMPARISON_ENABLED": "true",
+    "RELAY_ENABLED": "true"
+  }
+}
+```
+
+```bash
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+```
+
+To verify Access from Codex Cloud, run the acceptance script in the Cloud outer executor with `NODE_USE_ENV_PROXY=1` and the existing trusted proxy/CA configuration. An exact-hostname CONNECT denial occurs before the Worker or origin and is not an MCP authentication failure.
+
 ## MCP tools
 
 | Tool | Network behavior |
