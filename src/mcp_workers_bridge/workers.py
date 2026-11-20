@@ -120,6 +120,7 @@ class WorkersClient:
         *,
         query: str = "",
         headers: dict[str, str] | None = None,
+        body: str | None = None,
         max_bytes: int = 2_000_000,
     ):
         response = self.request(
@@ -129,7 +130,7 @@ class WorkersClient:
                 "parameters": parameters,
                 "query": query,
                 "headers": headers or {},
-                "body": None,
+                "body": body,
             },
         )
         try:

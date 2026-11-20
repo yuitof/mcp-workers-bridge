@@ -118,6 +118,35 @@ def test_relay_preserves_upstream_denial_as_structured_result(monkeypatch):
     assert result["body"] == "blocked"
 
 
+def test_relay_forwards_post_body_in_the_worker_envelope(monkeypatch):
+    reply = response("{}", **{"X-Bridge-Version": "1", "X-Origin-Http": "200"})
+    captured = {}
+
+    def request(method, url, **kwargs):
+        captured.update(method=method, url=url, **kwargs)
+        return reply
+
+    with WorkersClient(config()) as client:
+        monkeypatch.setattr(client.session, "request", request)
+        result = client.relay(
+            "youtube",
+            "browse",
+            {},
+            query="prettyPrint=false",
+            headers={"Cookie": "SAPISID=synthetic"},
+            body='{"browseId":"FEhistory","context":{}}',
+        )
+    assert result["ok"] is True
+    assert captured["json"] == {
+        "parameters": {},
+        "query": "prettyPrint=false",
+        "headers": {"Cookie": "SAPISID=synthetic"},
+        "body": '{"browseId":"FEhistory","context":{}}',
+    }
+    assert "synthetic-id" not in str(captured["json"])
+    assert "synthetic-secret" not in str(captured["json"])
+
+
 @pytest.mark.parametrize("video_id", ["short", "AAAAAAAAAAAA", "bad/id12345", ""])
 def test_invalid_video_id_is_rejected(monkeypatch, video_id):
     with WorkersClient(config()) as client:

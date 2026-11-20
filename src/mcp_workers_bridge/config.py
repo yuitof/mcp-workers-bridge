@@ -23,10 +23,6 @@ def _positive_float(name: str, default: float) -> float:
     return value
 
 
-def _enabled(name: str) -> bool:
-    return os.environ.get(name, "false").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def worker_origin(value: str) -> str:
     try:
         parsed = urlsplit(value)
@@ -83,24 +79,4 @@ class WorkersConfig:
             client_id=client_id,
             client_secret=client_secret,
             timeout=_positive_float("WORKERS_BRIDGE_TIMEOUT_SECONDS", 50),
-        )
-
-
-@dataclass(frozen=True)
-class LegacyConfig:
-    enabled: bool
-    vault_root: Path | None
-    function: str
-    table: str
-    timeout: float
-
-    @classmethod
-    def from_env(cls) -> "LegacyConfig":
-        root = os.environ.get("VAULT_ROOT", "").strip()
-        return cls(
-            enabled=_enabled("LEGACY_BRIDGE_ENABLED"),
-            vault_root=Path(root).expanduser() if root else None,
-            function=os.environ.get("SERVICE_BRIDGE_FUNCTION", "service-bridge"),
-            table=os.environ.get("SERVICE_BRIDGE_TABLE", "service-bridge-sessions"),
-            timeout=_positive_float("LEGACY_BRIDGE_TIMEOUT_SECONDS", 180),
         )

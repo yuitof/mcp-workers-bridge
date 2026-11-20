@@ -4,9 +4,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .config import LegacyConfig, WorkersConfig
+from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError
-from .legacy import LegacyBridge
 from .social import (
     reddit_comments,
     reddit_identity,
@@ -15,15 +14,21 @@ from .social import (
     x_graphql,
     x_home,
 )
+from .youtube_history import youtube_history
+from .youtube_cache import CacheManager
 from .workers import WorkersClient, error_result
 
 
 mcp = FastMCP(
     "Workers Bridge",
     instructions=(
-        "Use workers_bridge_probe before workers_youtube_captions. "
+        "Use workers_bridge_probe before authenticated or public network reads. "
         "The Workers endpoint supports arbitrary public YouTube video IDs and uses "
-        "signed-out requests. Caption text is omitted unless include_segments is true."
+        "signed-out caption requests. Caption text is omitted unless include_segments "
+        "is true. workers_youtube_history uses only the authenticated YouTube account "
+        "session through Workers and reports incomplete pagination as partial "
+        "coverage. It can read the vault-compatible local/S3 cache; cached reads "
+        "set refresh=false."
     ),
 )
 
@@ -46,7 +51,21 @@ def bridge_configuration() -> dict[str, Any]:
     except ConfigurationError as error:
         workers = None
         worker_error = str(error)
-    legacy = LegacyConfig.from_env()
+    try:
+        cache_manager = CacheManager.from_env()
+        cache = {
+            "enabled": cache_manager.enabled,
+            "directory": str(cache_manager.root) if cache_manager.root else None,
+            "s3_configured": cache_manager.s3_configured,
+            "error": None,
+        }
+    except BridgeError as error:
+        cache = {
+            "enabled": False,
+            "directory": None,
+            "s3_configured": False,
+            "error": str(error),
+        }
     return {
         "workers": {
             "configured": workers is not None,
@@ -54,12 +73,7 @@ def bridge_configuration() -> dict[str, Any]:
             "access_credentials_present": workers is not None,
             "configuration_error": worker_error,
         },
-        "legacy": {
-            "enabled": legacy.enabled,
-            "vault_root": str(legacy.vault_root) if legacy.vault_root else None,
-            "function": legacy.function,
-            "table": legacy.table,
-        },
+        "youtube_cache": cache,
     }
 
 
@@ -105,15 +119,34 @@ def workers_youtube_captions(
 
 
 @mcp.tool(
-    name="legacy_bridge_probe",
+    name="workers_youtube_history",
     description=(
-        "Run the documented unsigned probe for the existing Lambda/Tailscale "
-        "service-bridge through an existing vault checkout."
+        "Retrieve authenticated YouTube account watch history through Workers "
+        "with vault-compatible local/S3 caching."
     ),
 )
-def legacy_bridge_probe() -> dict[str, Any]:
+def workers_youtube_history(
+    since: str | None = None,
+    max_pages: int = 100,
+    timezone: str | None = None,
+    use_cache: bool = True,
+    refresh: bool = True,
+) -> dict[str, Any]:
+    if not 1 <= max_pages <= 500:
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "max_pages must be between 1 and 500.",
+        }
     try:
-        return LegacyBridge(LegacyConfig.from_env()).probe()
+        return youtube_history(
+            _workers() if refresh else None,
+            since,
+            max_pages,
+            timezone,
+            refresh=refresh,
+            cache_enabled=use_cache,
+        )
     except BridgeError as error:
         return error_result(error)
 
