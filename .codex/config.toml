@@ -1,0 +1,30 @@
+[mcp_servers.workers-bridge-cloud]
+command = "/bin/bash"
+args = [
+  "-c",
+  "root=$(git rev-parse --show-toplevel) && cd \"$root\" && exec .venv/bin/mcp-workers-bridge"
+]
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+env = { PYTHONUNBUFFERED = "1" }
+env_vars = [
+  "SERVICE_BRIDGE_WORKER_URL",
+  "CF_ACCESS_CLIENT_ID",
+  "CF_ACCESS_CLIENT_SECRET",
+  "YOUTUBE_STORAGE_STATE_JSON",
+  "YOUTUBE_TIMEZONE",
+  "YOUTUBE_CACHE_DIR",
+  "YOUTUBE_CACHE_BUCKET",
+  "X_STORAGE_STATE_JSON",
+  "REDDIT_STORAGE_STATE_JSON",
+  "AWS_REGION",
+  "AWS_PROFILE",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AWS_ROLE_ARN",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "SSL_CERT_FILE",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY"
+]

@@ -25,6 +25,10 @@ make check
 
 Or run them separately with `make python-test`, `make worker-check`, `make worker-test`, `make worker-build`, and `make terraform-check`.
 
+The repository also includes a project-scoped Codex MCP configuration and Cloud
+setup script. See [docs/codex-cloud.md](docs/codex-cloud.md) for environment
+variables, secret scopes, OIDC/S3 permissions, publishing, and verification.
+
 ## Configuration
 
 Use the MCP client's environment configuration or export these variables in the process that starts the MCP server. Do not commit values.

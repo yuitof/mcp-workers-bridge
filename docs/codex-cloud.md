@@ -1,0 +1,104 @@
+# Codex Cloud setup
+
+This repository includes a project-scoped MCP definition at
+`.codex/config.toml`. Codex Cloud must load the repository as a trusted project
+and complete the setup phase before the stdio MCP process starts.
+
+## Environment setup script
+
+Set the Cloud environment's install script to:
+
+```bash
+bash .codex/setup.sh
+```
+
+The script installs the locked Python environment and Worker npm dependencies.
+It does not collect history, read cookies, invoke the Worker, or deploy
+infrastructure. It also marks the checked-out workspace as trusted in the
+persistent Cloud Codex home, because project-scoped `.codex/config.toml` files
+are ignored for untrusted projects.
+
+## Environment variables
+
+Add these ordinary environment variables:
+
+```text
+SERVICE_BRIDGE_WORKER_URL=https://service-bridge-workers.english-vault-bridge.workers.dev
+YOUTUBE_TIMEZONE=Europe/London
+YOUTUBE_CACHE_DIR=/tmp/workers-bridge/youtube
+YOUTUBE_CACHE_BUCKET=english-vault-youtube-cache-cachebucket-giafchlzhpuf
+AWS_REGION=us-west-1
+```
+
+`YOUTUBE_CACHE_BUCKET` is optional. If S3 access is unavailable, history can
+still use the task-local cache, and Workers MCP calls can explicitly pass
+`use_cache=false`.
+
+## Private values
+
+Add the Cloudflare Access pair as HTTP secrets, each allowed for:
+
+```text
+service-bridge-workers.english-vault-bridge.workers.dev
+```
+
+```text
+CF_ACCESS_CLIENT_ID
+CF_ACCESS_CLIENT_SECRET
+```
+
+The values are the sensitive Terraform outputs
+`service_token_client_id` and `service_token_client_secret`. Do not store them
+in the repository or use the same values for unrelated HTTP services.
+
+Add collector sessions as personal environment variables because the MCP
+process must read and scope the cookies itself:
+
+```text
+YOUTUBE_STORAGE_STATE_JSON
+X_STORAGE_STATE_JSON
+REDDIT_STORAGE_STATE_JSON
+```
+
+Only add sessions for collectors you intend to use. Missing sessions produce
+structured MCP configuration errors for the corresponding tools.
+
+## S3 access
+
+Attach an AWS OIDC connection to the Cloud environment with read/write access
+to:
+
+```text
+arn:aws:s3:::english-vault-youtube-cache-cachebucket-giafchlzhpuf
+arn:aws:s3:::english-vault-youtube-cache-cachebucket-giafchlzhpuf/*
+```
+
+Allow these destinations when restricted internet access is enabled:
+
+```text
+sts.us-west-1.amazonaws.com
+s3.us-west-1.amazonaws.com
+english-vault-youtube-cache-cachebucket-giafchlzhpuf.s3.us-west-1.amazonaws.com
+```
+
+Enable the package-manager preset so setup can install Python and npm
+dependencies.
+
+## Publish and verify
+
+Save and republish the Cloud environment, then start a new task. Inside the
+task:
+
+1. Run `/mcp`.
+2. Confirm `workers-bridge-cloud` is connected.
+3. Call `bridge_configuration`.
+4. Call `workers_bridge_probe`.
+5. For a cache-only check, call `workers_youtube_history` with
+   `refresh=false`.
+
+If the project-scoped stdio server does not appear, verify that the repository
+is trusted and inspect the Cloud setup output for `.codex/setup.sh`. Current
+Codex documentation warns that local MCP servers and transports may not be
+available on every Cloud execution path; in that case this local-process MCP
+cannot be attached through Cloud settings alone. Use local Codex or a
+streamable-HTTP MCP deployment instead.
