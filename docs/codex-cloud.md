@@ -15,9 +15,10 @@ bash /workspace/mcp-workers-bridge/.codex/setup.sh
 Run setup with elevated sandbox permissions. It writes outside the checkout:
 the package-manager caches and `$CODEX_HOME/config.toml`, which carries the
 project trust entry and MCP server definition. A sandbox limited to workspace
-writes cannot complete those writes. In Codex Cloud the install-script phase
-runs inside the environment container; for Codex CLI use
-`--sandbox danger-full-access` or approve the escalation.
+writes cannot complete those writes. When an agent runs it, use
+`exec_command` with `sandbox_permissions: "require_escalated"` and a
+justification naming the out-of-workspace writes. In Codex Cloud the
+install-script phase itself runs inside the environment container.
 
 The script installs the locked Python environment and Worker npm dependencies.
 It does not collect history, read cookies, invoke the Worker, or deploy
