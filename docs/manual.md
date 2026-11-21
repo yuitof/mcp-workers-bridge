@@ -62,6 +62,11 @@ Each variable may contain several profiles:
 `clear_cookie_state` removes selected profiles from the running MCP process.
 Clearing is process-local; restarting Codex restores inherited values.
 
+Automatic Chrome extraction is disabled in Codex Cloud. Provide storage-state
+values through the environment, or set `MCP_WITHOUT_COOKIE = "1"` to expose
+only non-cookie tools. `MCP_DISABLE_COOKIE_EXTRACTION = "1"` forces extraction
+off in other environments.
+
 The preferred `LOCAL_CACHE_ROOT` layout drops `.codex/tmp`:
 
 ```text

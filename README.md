@@ -19,15 +19,59 @@ relay configuration is covered in [docs/manual.md](docs/manual.md).
 
 ### Register a user-level server
 
-Recommended PyPI registration:
+Add this table to `~/.codex/config.toml` (create the file if it does not
+exist). It must be at the top level, not inside another table:
+
+```toml
+[mcp_servers.workers-bridge]
+command = "uvx"
+args = ["mcp-workers-bridge"]
+startup_timeout_sec = 30
+tool_timeout_sec = 300
+env_vars = [
+  "YOUTUBE_STORAGE_STATE_JSON",
+  "YOUTUBE_TIMEZONE",
+  "X_STORAGE_STATE_JSON",
+  "REDDIT_STORAGE_STATE_JSON",
+  "S3_CACHE_BUCKET",
+  "SERVICE_BRIDGE_WORKER_URL",
+  "CF_ACCESS_CLIENT_ID",
+  "CF_ACCESS_CLIENT_SECRET",
+  "AWS_REGION",
+  "AWS_PROFILE",
+  "AWS_CONFIG_FILE",
+  "AWS_SHARED_CREDENTIALS_FILE",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AWS_ROLE_ARN",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
+  "SSL_CERT_FILE",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY"
+]
+
+[mcp_servers.workers-bridge.env]
+PYTHONUNBUFFERED = "1"
+LOCAL_CACHE_ROOT = "/path/to/private-cache-root"
+# MCP_APPROVE_FOR_ME = "1"
+# MCP_WITHOUT_COOKIE = "1"
+```
+
+Replace the cache path with an absolute path. The `env_vars` entries are names
+that must exist in the Codex process environment; they are not values. Restart
+Codex after adding or changing the table.
+
+Alternatively, let Codex create the `command`/`args` entry:
 
 ```bash
 codex mcp add workers-bridge -- uvx mcp-workers-bridge
 ```
 
-This registers a stdio server named `workers-bridge`. Codex stores `uvx` as
-the command and `mcp-workers-bridge` as its argument; at MCP startup, uvx
-resolves and runs the published package.
+That shortcut registers a stdio server named `workers-bridge`, but still add
+the `env` and `env_vars` sections manually. Codex stores `uvx` as the command
+and `mcp-workers-bridge` as its argument; at MCP startup, uvx resolves and runs
+the published package.
 
 Chrome cookie extraction is included in the default install. Codex runs the
 published package on demand.
@@ -49,11 +93,10 @@ only `bridge_configuration`, `workers_bridge_probe`,
 `workers_youtube_captions`, `workers_x_asset`, `clear_cookie_state`, and
 `clear_cache`.
 
+Add this under the same `[mcp_servers.workers-bridge.env]` table:
+
 ```toml
-[mcp_servers.workers-bridge]
-command = "uvx"
-args = ["mcp-workers-bridge"]
-env = { MCP_APPROVE_FOR_ME = "1" }
+MCP_APPROVE_FOR_ME = "1"
 ```
 
 `env` values are literal TOML values, so no shell expansion is involved.
@@ -76,23 +119,21 @@ Direct mode uses these variables:
 | YouTube local cache | `LOCAL_CACHE_ROOT` |
 | YouTube captions only | none |
 
+In Codex Cloud, automatic Chrome cookie extraction is disabled. Provide
+storage-state values through the environment or enable
+`MCP_WITHOUT_COOKIE=1`; `MCP_DISABLE_COOKIE_EXTRACTION=1` disables extraction
+explicitly in other environments.
+
 ### Local cache
 
-Declare the cache root as a literal value in the MCP server’s `env` table:
+Add the cache root to `[mcp_servers.workers-bridge.env]` as a literal value:
 
 ```toml
-[mcp_servers.workers-bridge]
-command = "uvx"
-args = ["mcp-workers-bridge"]
-env = { LOCAL_CACHE_ROOT = "/path/to/private-cache-root" }
+LOCAL_CACHE_ROOT = "/path/to/private-cache-root"
 ```
 
-TOML does not expand `$HOME` or `$VAR`, so use an absolute path. Combine values
-in the same map when needed:
-
-```toml
-env = { LOCAL_CACHE_ROOT = "/path/to/private-cache-root", MCP_APPROVE_FOR_ME = "1" }
-```
+TOML does not expand `$HOME` or `$VAR`, so use an absolute path. The cache key
+can sit alongside `MCP_APPROVE_FOR_ME` in the same env table.
 
 ## 3. Verify the connection
 

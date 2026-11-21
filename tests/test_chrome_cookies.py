@@ -131,6 +131,25 @@ def test_approve_for_me_caches_keychain_password(monkeypatch, tmp_path):
     assert cache.stat().st_mode & 0o777 == 0o600
 
 
+def test_cloud_mode_disables_extension(monkeypatch):
+    monkeypatch.setenv("MCP_CLOUD_MODE", "1")
+    with pytest.raises(chrome_cookies.ConfigurationError, match="Codex Cloud"):
+        chrome_cookies.automatic_storage_state("youtube")
+
+
+def test_detects_cloud_home(monkeypatch):
+    monkeypatch.delenv("CODEX_CLOUD", raising=False)
+    monkeypatch.delenv("MCP_CLOUD_MODE", raising=False)
+    monkeypatch.setattr(chrome_cookies.sys, "platform", "linux")
+    monkeypatch.setenv("HOME", "/home/agent")
+    assert chrome_cookies.in_codex_cloud() is True
+
+
+def test_extraction_disable_flag(monkeypatch):
+    monkeypatch.setenv("MCP_DISABLE_COOKIE_EXTRACTION", "1")
+    assert chrome_cookies.cookie_extraction_disabled() is True
+
+
 def test_automatic_storage_state_uses_requested_profile(monkeypatch):
     calls = []
     monkeypatch.setattr(chrome_cookies.sys, "platform", "darwin")

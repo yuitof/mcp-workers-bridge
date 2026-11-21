@@ -41,13 +41,27 @@ _CACHE: dict[tuple[str, str, str], list[dict]] = {}
 APPROVAL_ENV = "MCP_APPROVE_FOR_ME"
 
 
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def approve_for_me() -> bool:
-    return os.environ.get(APPROVAL_ENV, "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    return _truthy(os.environ.get(APPROVAL_ENV))
+
+
+def in_codex_cloud() -> bool:
+    if _truthy(os.environ.get("CODEX_CLOUD")) or _truthy(
+        os.environ.get("MCP_CLOUD_MODE")
+    ):
+        return True
+    return (
+        sys.platform.startswith("linux")
+        and os.environ.get("HOME", "").rstrip("/") == "/home/agent"
+    )
+
+
+def cookie_extraction_disabled() -> bool:
+    return _truthy(os.environ.get("MCP_DISABLE_COOKIE_EXTRACTION")) or in_codex_cloud()
 
 
 def approval_cache() -> Path:
@@ -164,6 +178,12 @@ def select_profile(data: dict, service: str, profile: str) -> dict | None:
 
 
 def automatic_storage_state(service: str, profile: str | None = None) -> dict:
+    if cookie_extraction_disabled():
+        raise ConfigurationError(
+            f"Automatic Chrome cookie extraction is disabled"
+            f"{' in Codex Cloud' if in_codex_cloud() else ''}; set "
+            f"{config_name(service)} or LOCAL_CACHE_ROOT."
+        )
     if sys.platform != "darwin":
         raise ConfigurationError(
             f"Set {config_name(service)} or LOCAL_CACHE_ROOT; automatic Chrome "
@@ -319,6 +339,11 @@ def main() -> None:
         parser.error("use either --stdout or --output, not both")
     if not arguments.stdout and arguments.output is None:
         parser.error("--output is required unless --stdout is used")
+    if cookie_extraction_disabled():
+        raise SystemExit(
+            "Chrome cookie extraction is disabled in Codex Cloud. Provide "
+            "storage-state values through the environment instead."
+        )
     if sys.platform != "darwin":
         raise SystemExit(
             "Automatic Chrome export is supported on macOS only. Export the "
