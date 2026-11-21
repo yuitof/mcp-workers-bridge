@@ -99,8 +99,8 @@ def test_uploads_transcript_before_manifest_and_excludes_auth(tmp_path):
     atomic_json(tmp_path / "auth/storage-state.json", {"cookies": ["private"]})
     cache.save(index, tmp_path)
     puts = [key for action, key in client.calls if action == "put"]
-    assert puts[0].startswith("cache/v1/transcripts/")
-    assert puts[-1] == "cache/v1/history.json"
+    assert puts[0].startswith("youtube/transcripts/")
+    assert puts[-1] == "youtube/history.json"
     assert not any(
         b"private" in content for content, _ in client.objects.values()
     )
@@ -204,12 +204,9 @@ def test_cache_manager_retains_local_progress_when_s3_fails(
     ] == VIDEO
 
 
-def test_manager_reads_bucket_from_vault_s3_config(monkeypatch, tmp_path):
-    monkeypatch.delenv("YOUTUBE_CACHE_BUCKET", raising=False)
-    monkeypatch.setenv("YOUTUBE_CACHE_DIR", str(tmp_path))
-    atomic_json(
-        tmp_path / "s3-config.json", {"bucket": "private-test-bucket"}
-    )
+def test_manager_reads_bucket_from_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("S3_CACHE_BUCKET", "private-test-bucket")
+    monkeypatch.setenv("LOCAL_CACHE_ROOT", str(tmp_path))
     monkeypatch.setattr(
         youtube_cache,
         "S3Cache",
@@ -220,7 +217,48 @@ def test_manager_reads_bucket_from_vault_s3_config(monkeypatch, tmp_path):
 
 
 def test_cache_can_be_explicitly_disabled(monkeypatch):
-    monkeypatch.setenv("VAULT_ROOT", "/unused")
+    monkeypatch.setenv("LOCAL_CACHE_ROOT", "/unused")
     manager = CacheManager.from_env(enabled=False)
     assert manager.enabled is False
     assert manager.s3_status == "disabled"
+
+
+def test_clear_local_cache_preserves_auth(tmp_path):
+    atomic_json(tmp_path / "history.json", sample())
+    atomic_json(tmp_path / "transcripts/latest.json", transcript())
+    atomic_json(tmp_path / "auth/storage-state.json", {"cookies": []})
+    result = youtube_cache.clear_local_cache(tmp_path)
+    assert result["history_removed"] is True
+    assert result["transcripts_removed"] is True
+    assert not (tmp_path / "history.json").exists()
+    assert not (tmp_path / "transcripts").exists()
+    assert (tmp_path / "auth/storage-state.json").is_file()
+
+
+def test_s3_clear_uses_cache_prefix():
+    class Client:
+        def __init__(self):
+            self.deleted = []
+
+        def list_objects_v2(self, Bucket, Prefix):
+            assert Prefix == "youtube/"
+            return {
+                "Contents": [
+                    {"Key": "youtube/history.json"},
+                    {"Key": "youtube/transcripts/example.json"},
+                ],
+                "IsTruncated": False,
+            }
+
+        def delete_objects(self, Bucket, Delete):
+            self.deleted.extend(
+                item["Key"] for item in Delete["Objects"]
+            )
+
+    client = Client()
+    removed = S3Cache("private-test-bucket", client).clear()
+    assert removed == 2
+    assert client.deleted == [
+        "youtube/history.json",
+        "youtube/transcripts/example.json",
+    ]

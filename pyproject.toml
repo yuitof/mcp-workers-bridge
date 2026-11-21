@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
   "beautifulsoup4==4.14.3",
   "boto3==1.42.0",
+  "cryptography==50.0.2",
   "defusedxml==0.7.1",
   "mcp==2.3.0",
   "requests==2.34.2",
@@ -37,8 +38,7 @@ Issues = "https://github.com/yuitof/mcp-workers-bridge/issues"
 Documentation = "https://github.com/yuitof/mcp-workers-bridge/blob/main/docs/manual.md"
 
 [project.optional-dependencies]
-test = ["pytest==9.2.0", "cryptography==50.0.2"]
-cookies = ["cryptography==50.0.2"]
+test = ["pytest==9.2.0"]
 
 [project.scripts]
 mcp-workers-bridge = "mcp_workers_bridge.server:main"

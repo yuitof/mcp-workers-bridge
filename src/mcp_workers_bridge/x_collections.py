@@ -325,9 +325,9 @@ def parse_timeline(
 
 
 class XCollectionClient:
-    def __init__(self, config: WorkersConfig | None):
+    def __init__(self, config: WorkersConfig | None, profile: str):
         self.config = config
-        self.state = CookieState("x")
+        self.state = CookieState("x", profile)
         self.client = (
             WorkersClient(config) if config is not None else DirectRelay(self.state)
         )
@@ -688,8 +688,9 @@ def collect_x_collection(
     max_pages: int = 20,
     cursor: str | None = None,
     count: int = 100,
+    profile: str,
 ) -> dict[str, Any]:
-    with XCollectionClient(config) as client:
+    with XCollectionClient(config, profile) as client:
         return client.collection(
             collection,
             max_pages=max_pages,

@@ -1,12 +1,15 @@
 """Stdio MCP server for the service bridge transports."""
 
+import os
 from typing import Any
 
 from mcp.server import MCPServer
 
 from .captions import direct_captions
+from .chrome_cookies import clear_storage_state, normalize_profile
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError
+from .paths import local_cache_root, vault_cache_root
 from .social import (
     reddit_comments,
     reddit_identity,
@@ -16,7 +19,7 @@ from .social import (
     x_home,
 )
 from .youtube_history import youtube_history
-from .youtube_cache import CacheManager
+from .youtube_cache import CacheManager, S3Cache, clear_local_cache
 from .workers import WorkersClient, error_result
 from .x_collections import collect_x_collection
 
@@ -141,6 +144,7 @@ def workers_youtube_captions(
     ),
 )
 def workers_youtube_history(
+    profile: str,
     since: str | None = None,
     max_pages: int = 100,
     timezone: str | None = None,
@@ -161,6 +165,7 @@ def workers_youtube_history(
             timezone,
             refresh=refresh,
             cache_enabled=use_cache,
+            profile=profile,
         )
     except BridgeError as error:
         return error_result(error)
@@ -173,11 +178,12 @@ def workers_youtube_history(
     ),
 )
 def workers_x_home(
+    profile: str,
     headers: dict[str, str] | None = None,
     max_bytes: int = 2_000_000,
 ) -> dict[str, Any]:
     try:
-        return x_home(_workers(), headers, max_bytes)
+        return x_home(_workers(), headers, max_bytes, profile=profile)
     except BridgeError as error:
         return error_result(error)
 
@@ -190,6 +196,7 @@ def workers_x_home(
     ),
 )
 def workers_x_graphql(
+    profile: str,
     query_id: str,
     operation_name: str,
     variables: dict[str, Any],
@@ -208,6 +215,7 @@ def workers_x_graphql(
             field_toggles,
             headers,
             max_bytes,
+            profile=profile,
         )
     except BridgeError as error:
         return error_result(error)
@@ -236,6 +244,7 @@ def _workers_x_collection(
     max_pages: int,
     cursor: str | None,
     count: int,
+    profile: str,
 ) -> dict[str, Any]:
     if not 1 <= max_pages <= 200:
         return {
@@ -256,6 +265,7 @@ def _workers_x_collection(
             max_pages=max_pages,
             cursor=cursor,
             count=count,
+            profile=profile,
         )
     except BridgeError as error:
         return error_result(error)
@@ -269,11 +279,12 @@ def _workers_x_collection(
     ),
 )
 def workers_x_likes(
+    profile: str,
     max_pages: int = 20,
     cursor: str | None = None,
     count: int = 100,
 ) -> dict[str, Any]:
-    return _workers_x_collection("likes", max_pages, cursor, count)
+    return _workers_x_collection("likes", max_pages, cursor, count, profile)
 
 
 @mcp.tool(
@@ -284,11 +295,12 @@ def workers_x_likes(
     ),
 )
 def workers_x_bookmarks(
+    profile: str,
     max_pages: int = 20,
     cursor: str | None = None,
     count: int = 100,
 ) -> dict[str, Any]:
-    return _workers_x_collection("bookmarks", max_pages, cursor, count)
+    return _workers_x_collection("bookmarks", max_pages, cursor, count, profile)
 
 
 @mcp.tool(
@@ -299,11 +311,12 @@ def workers_x_bookmarks(
     ),
 )
 def workers_reddit_identity(
+    profile: str,
     headers: dict[str, str] | None = None,
     max_bytes: int = 1_000_000,
 ) -> dict[str, Any]:
     try:
-        return reddit_identity(_workers(), headers, max_bytes)
+        return reddit_identity(_workers(), headers, max_bytes, profile=profile)
     except BridgeError as error:
         return error_result(error)
 
@@ -316,6 +329,7 @@ def workers_reddit_identity(
     ),
 )
 def workers_reddit_listing(
+    profile: str,
     account: str,
     collection: str,
     after: str | None = None,
@@ -324,7 +338,13 @@ def workers_reddit_listing(
 ) -> dict[str, Any]:
     try:
         return reddit_listing(
-            _workers(), account, collection, after, headers, max_bytes
+            _workers(),
+            account,
+            collection,
+            after,
+            headers,
+            max_bytes,
+            profile=profile,
         )
     except BridgeError as error:
         return error_result(error)
@@ -338,14 +358,110 @@ def workers_reddit_listing(
     ),
 )
 def workers_reddit_comments(
+    profile: str,
     permalink: str,
     headers: dict[str, str] | None = None,
     max_bytes: int = 12_000_000,
 ) -> dict[str, Any]:
     try:
-        return reddit_comments(_workers(), permalink, headers, max_bytes)
+        return reddit_comments(
+            _workers(),
+            permalink,
+            headers,
+            max_bytes,
+            profile=profile,
+        )
     except BridgeError as error:
         return error_result(error)
+
+
+@mcp.tool(
+    name="clear_cookie_state",
+    description=(
+        "Clear cookie state from the running MCP process, optionally limited to "
+        "one service and profile. The parent Codex environment is not modified."
+    ),
+)
+def clear_cookie_state(
+    service: str | None = None,
+    profile: str | None = None,
+) -> dict[str, Any]:
+    services = ["youtube", "x", "reddit"]
+    if service is not None and service not in services:
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "service must be youtube, x, or reddit.",
+        }
+    try:
+        selected = normalize_profile(profile) if profile is not None else None
+        cleared = {
+            name: clear_storage_state(name, selected)
+            for name in ([service] if service is not None else services)
+        }
+        return {
+            "ok": True,
+            "cleared": {
+                name: profiles for name, profiles in cleared.items() if profiles
+            },
+            "process_local": True,
+            "message": (
+                "Cleared from the MCP process. Restarting Codex restores values "
+                "inherited from the parent environment."
+            ),
+        }
+    except BridgeError as error:
+        return error_result(error)
+
+
+@mcp.tool(
+    name="clear_cache",
+    description=(
+        "Delete the YouTube cache locally, from S3, or both. Local clearing "
+        "removes only history.json and transcripts/, never auth cookies."
+    ),
+)
+def clear_cache(
+    target: str = "both",
+    service: str = "youtube",
+) -> dict[str, Any]:
+    if service != "youtube":
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "service must be youtube.",
+        }
+    if target not in {"local", "s3", "both"}:
+        return {
+            "ok": False,
+            "error": "invalid_argument",
+            "message": "target must be local, s3, or both.",
+        }
+    result: dict[str, Any] = {"ok": True, "service": service, "target": target}
+    try:
+        if target in {"local", "both"}:
+            root_value = local_cache_root()
+            if root_value:
+                result["local"] = clear_local_cache(
+                    vault_cache_root(root_value, service)
+                )
+            else:
+                result["local"] = {"skipped": "LOCAL_CACHE_ROOT is not set."}
+        if target in {"s3", "both"}:
+            bucket = os.environ.get("S3_CACHE_BUCKET", "").strip()
+            if bucket:
+                result["s3"] = {"removed_objects": S3Cache(bucket).clear()}
+            else:
+                result["s3"] = {"skipped": "S3_CACHE_BUCKET is not set."}
+        return result
+    except BridgeError as error:
+        return error_result(error)
+    except Exception:
+        return {
+            "ok": False,
+            "error": "cache_clear_failed",
+            "message": "The cache could not be cleared.",
+        }
 
 
 def main():

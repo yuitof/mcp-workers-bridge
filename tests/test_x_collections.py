@@ -291,7 +291,9 @@ def test_end_to_end_discovery_and_collection(monkeypatch):
 
     monkeypatch.setattr(x_collections, "WorkersClient", FakeWorkersClient)
     monkeypatch.setattr(x_collections, "ClientTransaction", FakeTransaction)
-    result = collect_x_collection(CONFIG, "likes", max_pages=1)
+    result = collect_x_collection(
+        CONFIG, "likes", max_pages=1, profile="Default"
+    )
 
     assert result["ok"] is True
     assert result["post_count"] == 1

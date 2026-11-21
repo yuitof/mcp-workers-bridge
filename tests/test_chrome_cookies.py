@@ -86,3 +86,41 @@ def test_stdout_emits_only_storage_state_json(monkeypatch, capsys):
     payload = json.loads(capture.out)
     assert payload["cookies"][0]["name"] == "SAPISID"
     assert payload["origins"] == []
+
+
+def test_automatic_storage_state_extracts_and_caches(monkeypatch):
+    calls = []
+    monkeypatch.setattr(chrome_cookies.sys, "platform", "darwin")
+    monkeypatch.delenv("MCP_CHROME_PROFILE", raising=False)
+    chrome_cookies.clear_cache()
+
+    def read(profile, root, service):
+        calls.append((profile, service))
+        return [{"name": "SAPISID", "value": "synthetic"}]
+
+    monkeypatch.setattr(chrome_cookies, "read_cookies", read)
+    first = chrome_cookies.automatic_storage_state("youtube")
+    second = chrome_cookies.automatic_storage_state("youtube")
+    assert first["cookies"][0]["name"] == "SAPISID"
+    assert second == first
+    assert calls == [("Default", "youtube")]
+
+
+def test_automatic_storage_state_requires_macos(monkeypatch):
+    monkeypatch.setattr(chrome_cookies.sys, "platform", "linux")
+    with pytest.raises(chrome_cookies.ConfigurationError):
+        chrome_cookies.automatic_storage_state("x")
+
+
+def test_automatic_storage_state_uses_requested_profile(monkeypatch):
+    calls = []
+    monkeypatch.setattr(chrome_cookies.sys, "platform", "darwin")
+    monkeypatch.setenv("MCP_CHROME_PROFILE", "Profile 2")
+    chrome_cookies.clear_cache()
+    monkeypatch.setattr(
+        chrome_cookies,
+        "read_cookies",
+        lambda profile, root, service: calls.append(profile) or [],
+    )
+    chrome_cookies.automatic_storage_state("x")
+    assert calls == ["Profile 2"]

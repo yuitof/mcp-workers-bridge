@@ -3,7 +3,6 @@
 from email.message import Message
 import json
 import os
-from pathlib import Path
 import re
 import time
 from urllib.parse import quote, unquote, urlencode, urlsplit
@@ -11,7 +10,14 @@ from urllib.parse import quote, unquote, urlencode, urlsplit
 import requests
 from requests.cookies import MockRequest, MockResponse
 
+from .chrome_cookies import (
+    ENV_NAMES,
+    automatic_storage_state,
+    normalize_profile,
+    select_profile,
+)
 from .errors import BridgeError, ConfigurationError
+from .paths import local_cache_root, vault_auth_path
 from .workers import WorkersClient
 
 
@@ -29,10 +35,6 @@ SESSION_COOKIES = {
 DOMAINS = {
     "x": {"x.com", "www.x.com"},
     "reddit": {"reddit.com", "www.reddit.com", "old.reddit.com"},
-}
-ENV_NAMES = {
-    "x": "X_STORAGE_STATE_JSON",
-    "reddit": "REDDIT_STORAGE_STATE_JSON",
 }
 X_ASSET_BASE = "https://abs.twimg.com/responsive-web/client-web/"
 
@@ -208,41 +210,33 @@ def relay(
 
 
 class CookieState:
-    def __init__(self, service: str):
+    def __init__(self, service: str, profile: str):
         if service not in SESSION_COOKIES:
             raise ValueError("Unknown social service.")
+        profile = normalize_profile(profile)
         self.service = service
         self.session = requests.Session()
         self.session.auth = lambda request: request
         self.session.trust_env = False
+        data = None
         raw = os.environ.get(ENV_NAMES[service])
         if raw:
             try:
-                data = json.loads(raw)
+                data = select_profile(json.loads(raw), service, profile)
             except ValueError:
                 raise ConfigurationError(f"{ENV_NAMES[service]} is not valid JSON.") from None
-        else:
-            root_value = os.environ.get("VAULT_ROOT")
-            if not root_value:
-                raise ConfigurationError(
-                    f"Set {ENV_NAMES[service]} or VAULT_ROOT to load the private session."
-                )
-            path = (
-                Path(root_value).expanduser()
-                / ".codex/tmp"
-                / service
-                / "auth/storage-state.json"
-            )
-            if not path.is_file():
-                raise ConfigurationError(
-                    f"No private {service} storage-state file was found."
-                )
-            try:
-                data = json.loads(path.read_text())
-            except (OSError, ValueError):
-                raise ConfigurationError(
-                    f"The private {service} storage-state file is invalid."
-                ) from None
+        if data is None and profile == "Default":
+            root_value = local_cache_root()
+            path = vault_auth_path(root_value, service) if root_value else None
+            if path is not None and path.is_file():
+                try:
+                    data = json.loads(path.read_text())
+                except (OSError, ValueError):
+                    raise ConfigurationError(
+                        f"The private {service} storage-state file is invalid."
+                    ) from None
+        if data is None:
+            data = automatic_storage_state(service, profile)
         now = time.time()
         cookies = [
             cookie
@@ -324,8 +318,14 @@ def _reddit_headers(extra: dict[str, str] | None = None):
     return headers
 
 
-def x_home(config, headers: dict[str, str] | None = None, max_bytes: int = 2_000_000):
-    state = CookieState("x")
+def x_home(
+    config,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 2_000_000,
+    *,
+    profile: str,
+):
+    state = CookieState("x", profile)
     try:
         request_headers = state.headers(
             "https://x.com/home", _x_headers(headers)
@@ -354,6 +354,8 @@ def x_graphql(
     field_toggles: dict,
     headers: dict[str, str] | None = None,
     max_bytes: int = 4_000_000,
+    *,
+    profile: str,
 ):
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", query_id):
         raise BridgeError("invalid_argument", "Invalid X GraphQL query ID.")
@@ -365,7 +367,7 @@ def x_graphql(
         }
     )
     url = f"https://x.com/i/api/graphql/{query_id}/{operation_name}"
-    state = CookieState("x")
+    state = CookieState("x", profile)
     try:
         request_headers = state.headers(url, _x_headers(headers))
         result = relay(
@@ -411,8 +413,10 @@ def reddit_identity(
     config,
     headers: dict[str, str] | None = None,
     max_bytes: int = 1_000_000,
+    *,
+    profile: str,
 ):
-    state = CookieState("reddit")
+    state = CookieState("reddit", profile)
     try:
         url = "https://old.reddit.com/api/me.json"
         request_headers = state.headers(url, _reddit_headers(headers))
@@ -438,6 +442,8 @@ def reddit_listing(
     after: str | None = None,
     headers: dict[str, str] | None = None,
     max_bytes: int = 8_000_000,
+    *,
+    profile: str,
 ):
     if not re.fullmatch(r"[A-Za-z0-9_-]{3,20}", account):
         raise BridgeError("invalid_argument", "Invalid Reddit account.")
@@ -446,7 +452,7 @@ def reddit_listing(
     if after is not None and not re.fullmatch(r"t[13]_[a-z0-9]{1,16}", after):
         raise BridgeError("invalid_argument", "Invalid Reddit continuation cursor.")
     url = f"https://old.reddit.com/user/{account}/{collection}.json"
-    state = CookieState("reddit")
+    state = CookieState("reddit", profile)
     try:
         request_headers = state.headers(url, _reddit_headers(headers))
         result = relay(
@@ -469,6 +475,8 @@ def reddit_comments(
     permalink: str,
     headers: dict[str, str] | None = None,
     max_bytes: int = 12_000_000,
+    *,
+    profile: str,
 ):
     parsed = urlsplit(permalink)
     if (
@@ -484,7 +492,7 @@ def reddit_comments(
         )
     ):
         raise BridgeError("invalid_argument", "Invalid Reddit comments permalink.")
-    state = CookieState("reddit")
+    state = CookieState("reddit", profile)
     try:
         request_headers = state.headers(
             "https://old.reddit.com" + parsed.path, _reddit_headers(headers)

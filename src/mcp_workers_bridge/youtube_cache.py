@@ -11,10 +11,12 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 from typing import Any
 
 from .errors import BridgeError, ConfigurationError
+from .paths import local_cache_root, vault_cache_root
 
 
 VIDEO_ID = re.compile(r"[-_A-Za-z0-9]{11}\Z")
@@ -22,10 +24,11 @@ TRANSCRIPT = re.compile(
     r"transcripts/([-_A-Za-z0-9]{11})\.([A-Za-z0-9-]+)\.json\Z"
 )
 REMOTE_TRANSCRIPT = re.compile(
-    r"cache/v1/transcripts/([-_A-Za-z0-9]{11})\."
+    r"youtube/transcripts/([-_A-Za-z0-9]{11})\."
     r"([A-Za-z0-9-]+)\.([0-9a-f]{64})\.json\Z"
 )
-HISTORY_KEY = "cache/v1/history.json"
+HISTORY_KEY = "youtube/history.json"
+CACHE_PREFIX = "youtube/"
 BUCKET = re.compile(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\Z")
 SAFE_ERROR = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 
@@ -202,10 +205,28 @@ def body(data: Any) -> bytes:
     ).encode()
 
 
+def clear_local_cache(root: Path) -> dict[str, Any]:
+    removed_history = False
+    removed_transcripts = False
+    history = root / "history.json"
+    if history.is_file():
+        history.unlink()
+        removed_history = True
+    transcripts = root / "transcripts"
+    if transcripts.is_dir():
+        shutil.rmtree(transcripts)
+        removed_transcripts = True
+    return {
+        "root": str(root),
+        "history_removed": removed_history,
+        "transcripts_removed": removed_transcripts,
+    }
+
+
 class S3Cache:
     def __init__(self, bucket: str, client=None):
         if not BUCKET.fullmatch(bucket):
-            raise ConfigurationError("YOUTUBE_CACHE_BUCKET is invalid.")
+            raise ConfigurationError("S3_CACHE_BUCKET is invalid.")
         if client is None:
             import boto3
             from botocore.config import Config
@@ -252,6 +273,34 @@ class S3Cache:
             **conditions,
         )
 
+    def keys(self) -> list[str]:
+        keys = []
+        token = None
+        while True:
+            arguments = {"Bucket": self.bucket, "Prefix": CACHE_PREFIX}
+            if token:
+                arguments["ContinuationToken"] = token
+            response = self.client.list_objects_v2(**arguments)
+            keys.extend(
+                item["Key"] for item in response.get("Contents", []) if "Key" in item
+            )
+            if not response.get("IsTruncated"):
+                return keys
+            token = response.get("NextContinuationToken")
+
+    def clear(self) -> int:
+        keys = self.keys()
+        for start in range(0, len(keys), 1000):
+            chunk = keys[start : start + 1000]
+            self.client.delete_objects(
+                Bucket=self.bucket,
+                Delete={
+                    "Objects": [{"Key": key} for key in chunk],
+                    "Quiet": True,
+                },
+            )
+        return len(keys)
+
     def upload_transcripts(
         self, index: dict[str, Any], root: Path
     ) -> None:
@@ -286,7 +335,7 @@ class S3Cache:
                 )
             digest = hashlib.sha256(body(data)).hexdigest()
             key = (
-                f"cache/v1/transcripts/{match.group(1)}."
+                f"youtube/transcripts/{match.group(1)}."
                 f"{match.group(2)}.{digest}.json"
             )
             if state.get("s3_key") == key:
@@ -345,38 +394,21 @@ class CacheManager:
     def from_env(cls, enabled: bool = True) -> "CacheManager":
         if not enabled:
             return cls(root=None, s3_status="disabled")
-        root_value = os.environ.get("YOUTUBE_CACHE_DIR", "").strip()
+        root_value = local_cache_root()
         if root_value:
-            root = Path(root_value).expanduser()
-        elif os.environ.get("VAULT_ROOT", "").strip():
-            root = (
-                Path(os.environ["VAULT_ROOT"]).expanduser()
-                / ".codex/tmp/youtube"
-            )
+            root = vault_cache_root(root_value)
         else:
-            if os.environ.get("YOUTUBE_CACHE_BUCKET", "").strip():
+            if os.environ.get("S3_CACHE_BUCKET", "").strip():
                 raise ConfigurationError(
-                    "Set YOUTUBE_CACHE_DIR or VAULT_ROOT when YOUTUBE_CACHE_BUCKET is configured."
+                    "Set LOCAL_CACHE_ROOT when S3_CACHE_BUCKET is configured."
                 )
             return cls(
                 root=None,
                 warnings=[
-                    "Set YOUTUBE_CACHE_DIR or VAULT_ROOT to enable the history cache."
+                    "Set LOCAL_CACHE_ROOT to enable the history cache."
                 ],
             )
-        bucket = os.environ.get("YOUTUBE_CACHE_BUCKET", "").strip()
-        if not bucket:
-            config = root / "s3-config.json"
-            if config.is_file():
-                try:
-                    value = json.loads(config.read_text())
-                    bucket = (
-                        value.get("bucket", "") if isinstance(value, dict) else ""
-                    )
-                except (OSError, ValueError):
-                    raise ConfigurationError(
-                        "The YouTube S3 cache configuration is invalid."
-                    ) from None
+        bucket = os.environ.get("S3_CACHE_BUCKET", "").strip()
         remote = S3Cache(bucket) if bucket else None
         return cls(root=root, remote=remote)
 

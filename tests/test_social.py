@@ -66,7 +66,7 @@ def test_x_home_adds_private_cookies(monkeypatch):
             }
 
     monkeypatch.setattr(social, "WorkersClient", Client)
-    result = social.x_home(CONFIG)
+    result = social.x_home(CONFIG, profile="Default")
     assert result["ok"] is True
     assert "auth_token=synthetic-auth" in captured["headers"]["Cookie"]
     assert "ct0=synthetic-csrf" in captured["headers"]["Cookie"]
@@ -99,7 +99,13 @@ def test_reddit_listing_builds_typed_request(monkeypatch):
             return {"ok": True, "bridge_ok": True, "body": "{}", "_set_cookies": []}
 
     monkeypatch.setattr(social, "WorkersClient", Client)
-    social.reddit_listing(CONFIG, "synthetic_user", "saved", "t3_abc")
+    social.reddit_listing(
+        CONFIG,
+        "synthetic_user",
+        "saved",
+        "t3_abc",
+        profile="Default",
+    )
     assert captured["parameters"] == {
         "account": "synthetic_user",
         "collection": "saved",
@@ -110,9 +116,138 @@ def test_reddit_listing_builds_typed_request(monkeypatch):
 
 def test_missing_private_session_is_sanitized(monkeypatch):
     monkeypatch.delenv("REDDIT_STORAGE_STATE_JSON", raising=False)
-    monkeypatch.delenv("VAULT_ROOT", raising=False)
+    monkeypatch.delenv("LOCAL_CACHE_ROOT", raising=False)
+    monkeypatch.setattr(
+        social,
+        "automatic_storage_state",
+        lambda service, profile: (_ for _ in ()).throw(
+            ConfigurationError(
+                "Set REDDIT_STORAGE_STATE_JSON or LOCAL_CACHE_ROOT to load the private session."
+            )
+        ),
+    )
     with pytest.raises(ConfigurationError, match="REDDIT_STORAGE_STATE_JSON"):
-        social.CookieState("reddit")
+        social.CookieState("reddit", "Default")
+
+
+def test_uses_chrome_cookies_when_private_session_is_unset(monkeypatch):
+    monkeypatch.delenv("X_STORAGE_STATE_JSON", raising=False)
+    monkeypatch.delenv("LOCAL_CACHE_ROOT", raising=False)
+    monkeypatch.setattr(
+        social,
+        "automatic_storage_state",
+        lambda service, profile: {
+            "cookies": [
+                {
+                    "name": "auth_token",
+                    "value": "synthetic-auth",
+                    "domain": ".x.com",
+                    "path": "/",
+                    "expires": -1,
+                },
+                {
+                    "name": "ct0",
+                    "value": "synthetic-csrf",
+                    "domain": ".x.com",
+                    "path": "/",
+                    "expires": -1,
+                },
+            ]
+        },
+    )
+    state = social.CookieState("x", "Default")
+    try:
+        assert state.session.cookies.get("auth_token", domain=".x.com") == (
+            "synthetic-auth"
+        )
+    finally:
+        state.close()
+
+
+def test_explicit_profile_overrides_private_session(monkeypatch):
+    monkeypatch.setenv("X_STORAGE_STATE_JSON", state("x", ("auth_token", "env")))
+    calls = []
+    monkeypatch.setattr(
+        social,
+        "automatic_storage_state",
+        lambda service, profile: calls.append((service, profile))
+        or {
+            "cookies": [
+                {
+                    "name": "auth_token",
+                    "value": "profile-auth",
+                    "domain": ".x.com",
+                    "path": "/",
+                    "expires": -1,
+                },
+                {
+                    "name": "ct0",
+                    "value": "profile-csrf",
+                    "domain": ".x.com",
+                    "path": "/",
+                    "expires": -1,
+                },
+            ]
+        },
+    )
+    cookie_state = social.CookieState("x", "Profile 2")
+    try:
+        assert calls == [("x", "Profile 2")]
+        assert cookie_state.session.cookies.get(
+            "auth_token", domain=".x.com"
+        ) == "profile-auth"
+    finally:
+        cookie_state.close()
+
+
+def test_multi_profile_storage_state_selects_profile(monkeypatch):
+    def cookie(value):
+        return {
+            "name": "auth_token",
+            "value": value,
+            "domain": ".x.com",
+            "path": "/",
+            "expires": -1,
+        }
+
+    monkeypatch.setenv(
+        "X_STORAGE_STATE_JSON",
+        json.dumps(
+            {
+                "profiles": {
+                    "Default": {
+                        "cookies": [
+                            cookie("default-auth"),
+                            {**cookie("default-csrf"), "name": "ct0"},
+                        ]
+                    },
+                    "Profile 2": {
+                        "cookies": [
+                            cookie("profile-auth"),
+                            {**cookie("profile-csrf"), "name": "ct0"},
+                        ]
+                    },
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        social,
+        "automatic_storage_state",
+        lambda service, profile: (_ for _ in ()).throw(AssertionError("unexpected")),
+    )
+    cookie_state = social.CookieState("x", "Profile 2")
+    try:
+        assert cookie_state.session.cookies.get(
+            "auth_token", domain=".x.com"
+        ) == "profile-auth"
+    finally:
+        cookie_state.close()
+
+
+def test_blank_profile_is_rejected():
+    with pytest.raises(ConfigurationError, match="profile is required"):
+        social.CookieState("x", "   ")
 
 
 def test_x_asset_never_returns_origin_cookies(monkeypatch):

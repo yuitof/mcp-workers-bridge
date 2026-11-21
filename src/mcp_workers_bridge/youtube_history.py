@@ -8,7 +8,6 @@ from email.message import Message
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import time
 from typing import Any
@@ -18,8 +17,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import requests
 from requests.cookies import MockRequest, MockResponse
 
+from .chrome_cookies import (
+    automatic_storage_state,
+    normalize_profile,
+    select_profile,
+)
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError, UpstreamError
+from .paths import local_cache_root, vault_auth_path
 from .social import DirectRelay
 from .workers import WorkersClient
 from .youtube_cache import CacheManager, now
@@ -299,43 +304,37 @@ def sapisidhash(sapisid: str, stamp: int | None = None) -> str:
     return f"SAPISIDHASH {timestamp}_{digest}"
 
 
-def _state_data() -> dict[str, Any]:
+def _state_data(profile: str) -> dict[str, Any]:
+    profile = normalize_profile(profile)
+    data = None
     raw = os.environ.get("YOUTUBE_STORAGE_STATE_JSON")
     if raw:
         try:
-            data = json.loads(raw)
+            data = select_profile(json.loads(raw), "youtube", profile)
         except ValueError:
             raise ConfigurationError(
                 "YOUTUBE_STORAGE_STATE_JSON is not valid JSON."
             ) from None
-    else:
-        root_value = os.environ.get("VAULT_ROOT")
-        if not root_value:
-            raise ConfigurationError(
-                "Set YOUTUBE_STORAGE_STATE_JSON or VAULT_ROOT to load the private YouTube session."
-            )
-        path = (
-            Path(root_value).expanduser()
-            / ".codex/tmp/youtube/auth/storage-state.json"
-        )
-        if not path.is_file():
-            raise ConfigurationError(
-                "No private YouTube storage-state file was found."
-            )
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, ValueError):
-            raise ConfigurationError(
-                "The private YouTube storage-state file is invalid."
-            ) from None
+    if data is None and profile == "Default":
+        root_value = local_cache_root()
+        path = vault_auth_path(root_value, "youtube") if root_value else None
+        if path is not None and path.is_file():
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, ValueError):
+                raise ConfigurationError(
+                    "The private YouTube storage-state file is invalid."
+                ) from None
+    if data is None:
+        data = automatic_storage_state("youtube", profile)
     if not isinstance(data, dict) or not isinstance(data.get("cookies"), list):
         raise ConfigurationError("The private YouTube storage state is invalid.")
     return data
 
 
 class YouTubeCookieState:
-    def __init__(self):
-        data = _state_data()
+    def __init__(self, profile: str):
+        data = _state_data(profile)
         now = time.time()
         self.session = requests.Session()
         self.session.auth = lambda request: request
@@ -711,6 +710,7 @@ def youtube_history(
     refresh: bool = True,
     cache_enabled: bool = True,
     cache_manager: CacheManager | None = None,
+    profile: str | None = None,
 ) -> dict[str, Any]:
     if not 1 <= max_pages <= 500:
         raise HistoryError(
@@ -769,7 +769,11 @@ def youtube_history(
             manager,
             refresh=False,
         )
-    state = YouTubeCookieState()
+    if profile is None:
+        raise ConfigurationError(
+            "profile is required when refresh=true; use Default or Profile N."
+        )
+    state = YouTubeCookieState(profile)
     observations: dict[tuple[str, str], dict[str, Any]] = {}
     unknown: set[str] = set()
     failures: list[str] = []

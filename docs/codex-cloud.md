@@ -78,12 +78,12 @@ Add these ordinary environment variables:
 ```text
 SERVICE_BRIDGE_WORKER_URL=https://service-bridge.<account-subdomain>.workers.dev
 YOUTUBE_TIMEZONE=Europe/London
-YOUTUBE_CACHE_DIR=/tmp/workers-bridge/youtube
-YOUTUBE_CACHE_BUCKET=english-vault-youtube-cache-cachebucket-giafchlzhpuf
+LOCAL_CACHE_ROOT=/tmp/workers-bridge
+S3_CACHE_BUCKET=english-vault-youtube-cache-cachebucket-giafchlzhpuf
 AWS_REGION=us-west-1
 ```
 
-`YOUTUBE_CACHE_BUCKET` is optional. If S3 access is unavailable, history can
+`S3_CACHE_BUCKET` is optional. If S3 access is unavailable, history can
 still use the task-local cache, and Workers MCP calls can explicitly pass
 `use_cache=false`.
 

@@ -189,6 +189,7 @@ def test_retrieves_continuation_and_normalizes_video_days(monkeypatch):
         since=str(current - timedelta(days=1)),
         max_pages=5,
         timezone_name=ZONE,
+        profile="Default",
     )
 
     assert output["ok"] is True
@@ -219,6 +220,7 @@ def test_uses_vault_authentication_context_and_cookie_scope():
         since=str(current),
         max_pages=1,
         timezone_name="Asia/Tokyo",
+        profile="Default",
     )
 
     bootstrap_call = FakeWorkersClient.calls[0][3]
@@ -249,6 +251,7 @@ def test_page_cap_returns_visible_partial_coverage():
         since=str(current),
         max_pages=1,
         timezone_name=ZONE,
+        profile="Default",
     )
 
     assert output["ok"] is False
@@ -273,10 +276,52 @@ def test_refresh_without_worker_uses_direct_transport(monkeypatch):
         since=str(current),
         max_pages=1,
         timezone_name=ZONE,
+        profile="Default",
     )
 
     assert output["ok"] is True
     assert [call[1] for call in FakeWorkersClient.calls] == ["history", "browse"]
+
+
+def test_state_data_uses_chrome_cookies_when_session_unset(monkeypatch):
+    monkeypatch.delenv("YOUTUBE_STORAGE_STATE_JSON", raising=False)
+    monkeypatch.delenv("LOCAL_CACHE_ROOT", raising=False)
+    monkeypatch.setattr(
+        history,
+        "automatic_storage_state",
+        lambda service, profile: {
+            "cookies": [
+                {
+                    "name": "SAPISID",
+                    "value": "synthetic-sid",
+                    "domain": ".youtube.com",
+                    "path": "/",
+                    "expires": -1,
+                }
+            ]
+        },
+    )
+    data = history._state_data("Default")
+    assert data["cookies"][0]["name"] == "SAPISID"
+
+
+def test_state_data_explicit_profile_overrides_environment(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_STORAGE_STATE_JSON", '{"cookies":[]}')
+    calls = []
+    monkeypatch.setattr(
+        history,
+        "automatic_storage_state",
+        lambda service, profile: calls.append((service, profile))
+        or {"cookies": [{"name": "SAPISID", "value": "synthetic"}]},
+    )
+    data = history._state_data("Profile 2")
+    assert calls == [("youtube", "Profile 2")]
+    assert data["cookies"][0]["value"] == "synthetic"
+
+
+def test_state_data_rejects_blank_profile():
+    with pytest.raises(ConfigurationError, match="profile is required"):
+        history._state_data("")
 
 
 def test_refresh_checkpoints_vault_compatible_local_history(monkeypatch, tmp_path):
@@ -292,6 +337,7 @@ def test_refresh_checkpoints_vault_compatible_local_history(monkeypatch, tmp_pat
         max_pages=1,
         timezone_name=ZONE,
         cache_manager=manager,
+        profile="Default",
     )
     cached = json.loads((tmp_path / "history.json").read_text())
     assert output["cache"]["local_checkpoint_written"] is True
@@ -333,6 +379,7 @@ def test_cache_only_read_does_not_require_worker_credentials(tmp_path):
         timezone_name=ZONE,
         refresh=False,
         cache_manager=manager,
+        profile="Default",
     )
     assert output["ok"] is True
     assert output["cache_only"] is True
@@ -354,6 +401,7 @@ def test_failed_continuation_preserves_first_page(monkeypatch):
         since=str(current),
         max_pages=5,
         timezone_name=ZONE,
+        profile="Default",
     )
 
     assert output["ok"] is False
@@ -377,6 +425,7 @@ def test_signed_out_history_is_not_returned_as_empty():
             since=str(today()),
             max_pages=1,
             timezone_name=ZONE,
+            profile="Default",
         )
 
 
@@ -397,6 +446,7 @@ def test_rejects_invalid_arguments(since, max_pages, timezone):
             since=since,
             max_pages=max_pages,
             timezone_name=timezone,
+            profile="Default",
         )
 
 
@@ -418,13 +468,13 @@ def test_rejects_expired_required_session_cookie(monkeypatch):
         ),
     )
     with pytest.raises(ConfigurationError) as error:
-        history.YouTubeCookieState()
+        history.YouTubeCookieState("Default")
     assert "expired-secret" not in str(error.value)
 
 
 def test_loads_standard_vault_session_with_secure_papisid(monkeypatch, tmp_path):
     monkeypatch.delenv("YOUTUBE_STORAGE_STATE_JSON", raising=False)
-    monkeypatch.setenv("VAULT_ROOT", str(tmp_path))
+    monkeypatch.setenv("LOCAL_CACHE_ROOT", str(tmp_path))
     path = tmp_path / ".codex/tmp/youtube/auth/storage-state.json"
     path.parent.mkdir(parents=True)
     path.write_text(
@@ -443,7 +493,7 @@ def test_loads_standard_vault_session_with_secure_papisid(monkeypatch, tmp_path)
             }
         )
     )
-    state = history.YouTubeCookieState()
+    state = history.YouTubeCookieState("Default")
     try:
         assert "__Secure-3PAPISID=synthetic-papisid" in state.cookie_header(
             "POST", history.BROWSE_URL
