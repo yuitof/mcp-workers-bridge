@@ -147,6 +147,10 @@ codex mcp list
   server package used by `uvx mcp-workers-bridge`.
 - [docs/manual.md](docs/manual.md): full configuration, tool reference, cache,
   acceptance results, and security boundaries.
+- [docs/environment.md](docs/environment.md): environment variable and mode
+  reference.
+- [docs/deploying.md](docs/deploying.md): Cloudflare API token permissions,
+  dependency installation, and Worker/Access deployment.
 - [docs/codex-cloud.md](docs/codex-cloud.md): Codex Cloud setup, secrets, OIDC,
   and S3 permissions.
 - [infra/service-bridge-workers/README.md](infra/service-bridge-workers/README.md):

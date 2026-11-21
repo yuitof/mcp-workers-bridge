@@ -190,11 +190,7 @@ def automatic_storage_state(service: str, profile: str | None = None) -> dict:
             "cookie extraction is only available on macOS."
         )
     root = CHROME_ROOT
-    profile = normalize_profile(
-        profile
-        or os.environ.get("MCP_CHROME_PROFILE", "Default").strip()
-        or "Default"
-    )
+    profile = normalize_profile(profile or "Default")
     key = (service, profile, str(root))
     if key not in _CACHE:
         try:

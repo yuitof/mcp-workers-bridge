@@ -92,7 +92,6 @@ def test_stdout_emits_only_storage_state_json(monkeypatch, capsys):
 def test_automatic_storage_state_extracts_and_caches(monkeypatch):
     calls = []
     monkeypatch.setattr(chrome_cookies.sys, "platform", "darwin")
-    monkeypatch.delenv("MCP_CHROME_PROFILE", raising=False)
     chrome_cookies.clear_cache()
 
     def read(profile, root, service):
@@ -153,12 +152,11 @@ def test_extraction_disable_flag(monkeypatch):
 def test_automatic_storage_state_uses_requested_profile(monkeypatch):
     calls = []
     monkeypatch.setattr(chrome_cookies.sys, "platform", "darwin")
-    monkeypatch.setenv("MCP_CHROME_PROFILE", "Profile 2")
     chrome_cookies.clear_cache()
     monkeypatch.setattr(
         chrome_cookies,
         "read_cookies",
         lambda profile, root, service: calls.append(profile) or [],
     )
-    chrome_cookies.automatic_storage_state("x")
+    chrome_cookies.automatic_storage_state("x", "Profile 2")
     assert calls == ["Profile 2"]
