@@ -59,6 +59,49 @@ or several:
 The old single-profile form is treated as `Default`. If the requested profile
 is absent, the server extracts it from Chrome on macOS.
 
+## Chrome storage-state exporter
+
+The package includes the `chrome-storage-state` console tool. It reads Chrome
+cookies on macOS and prints storage-state JSON with `--stdout`:
+
+```bash
+uvx --system-certs --from mcp-workers-bridge chrome-storage-state youtube \
+  --profile "Default" --stdout
+```
+
+Capture the output directly into the matching variable:
+
+```bash
+export YOUTUBE_STORAGE_STATE_JSON="$(
+  uvx --system-certs --from mcp-workers-bridge chrome-storage-state youtube \
+    --profile "Default" --stdout
+)"
+export X_STORAGE_STATE_JSON="$(
+  uvx --system-certs --from mcp-workers-bridge chrome-storage-state x \
+    --profile "Default" --stdout
+)"
+export REDDIT_STORAGE_STATE_JSON="$(
+  uvx --system-certs --from mcp-workers-bridge chrome-storage-state reddit \
+    --profile "Default" --stdout
+)"
+```
+
+`SERVICE` accepts `youtube`, `x`, or `reddit`. `--profile` accepts `Default` or
+`Profile <number>`. Use `--output PATH` instead of `--stdout` to write a
+mode-600 file. The tool exits with an error if the profile is not signed in,
+the required cookie names are missing, or extraction is disabled in Codex
+Cloud.
+
+For a clipboard-based macOS flow, be aware that other applications can read
+the clipboard:
+
+```bash
+uvx --system-certs --from mcp-workers-bridge chrome-storage-state youtube \
+  --profile "Default" --stdout | pbcopy
+export YOUTUBE_STORAGE_STATE_JSON="$(pbpaste)"
+pbcopy </dev/null
+```
+
 ## Cookie modes
 
 | Variable | Default | Purpose |
