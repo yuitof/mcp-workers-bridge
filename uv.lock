@@ -548,7 +548,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+cookies = [
+    { name = "cryptography" },
+]
 test = [
+    { name = "cryptography" },
     { name = "pytest" },
 ]
 
@@ -556,13 +560,15 @@ test = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = "==4.14.3" },
     { name = "boto3", specifier = "==1.42.0" },
+    { name = "cryptography", marker = "extra == 'cookies'", specifier = "==50.0.2" },
+    { name = "cryptography", marker = "extra == 'test'", specifier = "==50.0.2" },
     { name = "defusedxml", specifier = "==0.7.1" },
     { name = "mcp", specifier = "==2.3.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = "==9.2.0" },
     { name = "requests", specifier = "==2.34.2" },
     { name = "xclienttransaction", specifier = "==1.0.3" },
 ]
-provides-extras = ["test"]
+provides-extras = ["test", "cookies"]
 
 [[package]]
 name = "opentelemetry-api"

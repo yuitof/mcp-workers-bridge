@@ -37,10 +37,12 @@ Issues = "https://github.com/yuitof/mcp-workers-bridge/issues"
 Documentation = "https://github.com/yuitof/mcp-workers-bridge/blob/main/docs/manual.md"
 
 [project.optional-dependencies]
-test = ["pytest==9.2.0"]
+test = ["pytest==9.2.0", "cryptography==50.0.2"]
+cookies = ["cryptography==50.0.2"]
 
 [project.scripts]
 mcp-workers-bridge = "mcp_workers_bridge.server:main"
+chrome-storage-state = "mcp_workers_bridge.chrome_cookies:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "mcp_workers_bridge.__version__"}

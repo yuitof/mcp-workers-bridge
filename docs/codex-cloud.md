@@ -9,7 +9,7 @@ and complete the setup phase before the stdio MCP process starts.
 Set the Cloud environment's install script to:
 
 ```bash
-bash /workspace/mcp-workers-bridge/.codex/setup.sh
+bash mcp-workers-bridge/.codex/setup.sh
 ```
 
 Run setup with elevated sandbox permissions. It writes outside the checkout:

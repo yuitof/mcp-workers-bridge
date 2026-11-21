@@ -147,7 +147,7 @@ After `uv sync`, use the absolute executable:
 {
   "mcpServers": {
     "workers-bridge": {
-      "command": "/Users/owner/mcp-workers-bridge/.venv/bin/mcp-workers-bridge",
+      "command": "/path/to/mcp-workers-bridge/.venv/bin/mcp-workers-bridge",
       "args": []
     }
   }

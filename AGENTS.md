@@ -6,13 +6,13 @@ Run setup before MCP-dependent work using `exec_command` with elevated
 permissions:
 
 ```text
-cmd: bash /workspace/mcp-workers-bridge/.codex/setup.sh
+cmd: bash mcp-workers-bridge/.codex/setup.sh
 sandbox_permissions: require_escalated
 justification: Setup writes package caches and $CODEX_HOME/config.toml outside
 the workspace.
 ```
 
-Use the absolute path above in Codex Cloud. Locally, use
+Run that command from the workspace root in Codex Cloud. Locally, use
 `bash "$(git rev-parse --show-toplevel)/.codex/setup.sh"` as the command with
 the same `sandbox_permissions: require_escalated` setting.
 
