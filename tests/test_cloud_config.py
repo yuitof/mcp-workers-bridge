@@ -13,8 +13,13 @@ def test_project_mcp_definition_uses_cloud_safe_launcher():
     server = config["mcp_servers"]["workers-bridge-cloud"]
     assert server["command"] == "/bin/bash"
     assert "git rev-parse --show-toplevel" in server["args"][1]
-    assert server["args"][1].endswith("exec .venv/bin/mcp-workers-bridge")
-    assert server["startup_timeout_sec"] == 30
+    assert "git fetch origin main" in server["args"][1]
+    assert "git merge --ff-only origin/main" in server["args"][1]
+    assert "bash \"$root/.codex/setup.sh\"" in server["args"][1]
+    assert server["args"][1].endswith(
+        'exec "$root/.venv/bin/mcp-workers-bridge"'
+    )
+    assert server["startup_timeout_sec"] == 600
     assert server["tool_timeout_sec"] == 300
 
 

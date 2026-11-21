@@ -20,6 +20,12 @@ are ignored for untrusted projects. Trust registration replaces
 `config.toml` atomically, so an existing read-only file is supported when its
 containing Codex home directory is writable.
 
+The MCP launcher refreshes the checkout before every startup: it fast-forwards
+`origin/main`, runs `.codex/setup.sh`, and only then starts the MCP server.
+Bootstrap and setup output is written to stderr so it cannot interfere with the
+MCP JSON stream. Codex sends its normal MCP initialization request after the
+launcher transfers control to `.venv/bin/mcp-workers-bridge`.
+
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
 npm, and XDG state. This avoids failures when Cloud mounts the home-directory
 cache read-only. Set `MCP_WORKERS_BRIDGE_SETUP_CACHE` to another writable
