@@ -18,7 +18,9 @@ project trust entry and MCP server definition. A sandbox limited to workspace
 writes cannot complete those writes. When an agent runs it, use
 `exec_command` with `sandbox_permissions: "require_escalated"` and a
 justification naming the out-of-workspace writes. In Codex Cloud the
-install-script phase itself runs inside the environment container.
+install-script phase itself runs inside the environment container. If a setup
+run fails, retry it once with `sandbox_permissions: "require_escalated"`
+before treating the failure as a blocker.
 
 The script installs the locked Python environment and Worker npm dependencies.
 It does not collect history, read cookies, invoke the Worker, or deploy
