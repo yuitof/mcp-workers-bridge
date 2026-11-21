@@ -1,6 +1,8 @@
 import asyncio
+import ast
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -183,6 +185,40 @@ def test_clear_cache_can_clear_local_and_s3(monkeypatch, tmp_path):
     assert result["ok"] is True
     assert result["local"] == {"root": str(tmp_path / "youtube")}
     assert result["s3"] == {"removed_objects": 3}
+
+
+def test_without_cookie_mode_hides_cookie_tools():
+    script = """
+import asyncio
+from mcp import Client
+from mcp_workers_bridge import server
+
+async def main():
+    async with Client(server.mcp) as client:
+        tools = await client.list_tools()
+        print(sorted(tool.name for tool in tools.tools))
+
+asyncio.run(main())
+"""
+    environment = os.environ.copy()
+    environment["MCP_WITHOUT_COOKIE"] = "1"
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=PROJECT_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    names = set(ast.literal_eval(completed.stdout.strip().splitlines()[-1]))
+    assert names == {
+        "bridge_configuration",
+        "clear_cache",
+        "clear_cookie_state",
+        "workers_bridge_probe",
+        "workers_x_asset",
+        "workers_youtube_captions",
+    }
 
 
 def test_bridge_configuration_reports_direct_mode_without_worker(monkeypatch):

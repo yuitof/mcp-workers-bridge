@@ -29,6 +29,19 @@ reports `mode = "direct"`, and `workers_bridge_probe` reports
 `trust_env = False`, so `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` do not
 apply to them.
 
+### Modes
+
+Set `MCP_WITHOUT_COOKIE = "1"` in the MCP server's `env` table to hide the
+cookie-backed tools at registration. The remaining tools are
+`bridge_configuration`, `workers_bridge_probe`,
+`workers_youtube_captions`, `workers_x_asset`, `clear_cookie_state`, and
+`clear_cache`.
+
+Set `MCP_APPROVE_FOR_ME = "1"` to cache the Chrome Safe Storage password after
+the first successful Keychain read. The cache is
+`~/.private/mcp-workers-bridge/chrome-safe-storage`, mode 600. Remove it to
+revoke the cached approval. `bridge_configuration` reports both mode flags.
+
 The storage-state variables are optional. Cookie-backed tools require a
 `profile` argument; if that profile is absent from the variable, the tool
 extracts it from Chrome on macOS and caches the cookies for the MCP process.

@@ -6,7 +6,11 @@ from typing import Any
 from mcp.server import MCPServer
 
 from .captions import direct_captions
-from .chrome_cookies import clear_storage_state, normalize_profile
+from .chrome_cookies import (
+    approve_for_me,
+    clear_storage_state,
+    normalize_profile,
+)
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError
 from .paths import local_cache_root, vault_cache_root
@@ -39,11 +43,45 @@ mcp = MCPServer(
 )
 
 
+COOKIE_TOOLS = {
+    "workers_youtube_history",
+    "workers_x_home",
+    "workers_x_graphql",
+    "workers_x_likes",
+    "workers_x_bookmarks",
+    "workers_reddit_identity",
+    "workers_reddit_listing",
+    "workers_reddit_comments",
+}
+
+
+def without_cookie() -> bool:
+    return os.environ.get("MCP_WITHOUT_COOKIE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def tool_enabled(name: str) -> bool:
+    return not without_cookie() or name not in COOKIE_TOOLS
+
+
+def tool(**kwargs):
+    def register(function):
+        if not tool_enabled(kwargs.get("name", "")):
+            return function
+        return mcp.tool(**kwargs)(function)
+
+    return register
+
+
 def _workers():
     return WorkersConfig.from_env()
 
 
-@mcp.tool(
+@tool(
     name="bridge_configuration",
     description="Report configured bridge backends without exposing secret values.",
 )
@@ -70,6 +108,8 @@ def bridge_configuration() -> dict[str, Any]:
             "error": str(error),
         }
     return {
+        "cookie_mode": "without" if without_cookie() else "enabled",
+        "approve_for_me": approve_for_me(),
         "mode": "workers" if workers is not None else "direct",
         "workers": {
             "configured": workers is not None,
@@ -81,7 +121,7 @@ def bridge_configuration() -> dict[str, Any]:
     }
 
 
-@mcp.tool(
+@tool(
     name="workers_bridge_probe",
     description=(
         "Verify Cloudflare Access and a Gateway public-IP observation through "
@@ -107,7 +147,7 @@ def workers_bridge_probe() -> dict[str, Any]:
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_youtube_captions",
     description=(
         "Retrieve signed-out English captions for any public YouTube video through "
@@ -136,7 +176,7 @@ def workers_youtube_captions(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_youtube_history",
     description=(
         "Retrieve authenticated YouTube account watch history through Workers "
@@ -171,7 +211,7 @@ def workers_youtube_history(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_x_home",
     description=(
         "Fetch the authenticated X home page through the Cloudflare Workers relay."
@@ -188,7 +228,7 @@ def workers_x_home(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_x_graphql",
     description=(
         "Perform an allowlisted read-only X GraphQL request through the Cloudflare "
@@ -221,7 +261,7 @@ def workers_x_graphql(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_x_asset",
     description=(
         "Fetch an allowlisted X web-client JavaScript asset through the Cloudflare "
@@ -271,7 +311,7 @@ def _workers_x_collection(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_x_likes",
     description=(
         "Discover the current X GraphQL operation and transaction headers, verify "
@@ -287,7 +327,7 @@ def workers_x_likes(
     return _workers_x_collection("likes", max_pages, cursor, count, profile)
 
 
-@mcp.tool(
+@tool(
     name="workers_x_bookmarks",
     description=(
         "Discover the current X GraphQL operation and transaction headers, verify "
@@ -303,7 +343,7 @@ def workers_x_bookmarks(
     return _workers_x_collection("bookmarks", max_pages, cursor, count, profile)
 
 
-@mcp.tool(
+@tool(
     name="workers_reddit_identity",
     description=(
         "Verify and return the authenticated Reddit identity through the Cloudflare "
@@ -321,7 +361,7 @@ def workers_reddit_identity(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_reddit_listing",
     description=(
         "Fetch one authenticated Old Reddit JSON listing page for an allowlisted "
@@ -350,7 +390,7 @@ def workers_reddit_listing(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="workers_reddit_comments",
     description=(
         "Fetch an authenticated Old Reddit post/comment page through the Cloudflare "
@@ -375,7 +415,7 @@ def workers_reddit_comments(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="clear_cookie_state",
     description=(
         "Clear cookie state from the running MCP process, optionally limited to "
@@ -414,7 +454,7 @@ def clear_cookie_state(
         return error_result(error)
 
 
-@mcp.tool(
+@tool(
     name="clear_cache",
     description=(
         "Delete the YouTube cache locally, from S3, or both. Local clearing "

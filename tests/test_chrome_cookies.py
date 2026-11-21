@@ -1,5 +1,6 @@
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import padding
@@ -110,6 +111,24 @@ def test_automatic_storage_state_requires_macos(monkeypatch):
     monkeypatch.setattr(chrome_cookies.sys, "platform", "linux")
     with pytest.raises(chrome_cookies.ConfigurationError):
         chrome_cookies.automatic_storage_state("x")
+
+
+def test_approve_for_me_caches_keychain_password(monkeypatch, tmp_path):
+    cache = tmp_path / "chrome-safe-storage"
+    calls = []
+    monkeypatch.setenv("MCP_APPROVE_FOR_ME", "1")
+    monkeypatch.setattr(chrome_cookies, "approval_cache", lambda: cache)
+
+    def run(*args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="synthetic-password\n")
+
+    monkeypatch.setattr(chrome_cookies.subprocess, "run", run)
+    assert chrome_cookies.chrome_password() == b"synthetic-password"
+    assert chrome_cookies.chrome_password() == b"synthetic-password"
+    assert len(calls) == 1
+    assert cache.read_text() == "synthetic-password"
+    assert cache.stat().st_mode & 0o777 == 0o600
 
 
 def test_automatic_storage_state_uses_requested_profile(monkeypatch):

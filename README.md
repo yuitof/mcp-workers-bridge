@@ -25,13 +25,38 @@ Recommended PyPI registration:
 codex mcp add workers-bridge -- uvx mcp-workers-bridge
 ```
 
-The `cookies` extra enables automatic Chrome extraction. Codex runs the
+Chrome cookie extraction is included in the default install. Codex runs the
 published package on demand.
 
 Environment variables must be declared inside the Codex session: `env_vars`
 only forwards variables that the Codex process inherited at startup. Exports
 from a separate terminal, or added after Codex started, are not visible to the
 MCP server. Restart Codex after changing the config or environment.
+
+### Modes
+
+Set mode values in the MCP server entry in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.workers-bridge]
+env = { MCP_WITHOUT_COOKIE = "1" }
+```
+
+`MCP_WITHOUT_COOKIE=1` hides every cookie-backed tool at startup. It exposes
+only `bridge_configuration`, `workers_bridge_probe`,
+`workers_youtube_captions`, `workers_x_asset`, `clear_cookie_state`, and
+`clear_cache`.
+
+```toml
+env = { MCP_APPROVE_FOR_ME = "1" }
+```
+
+`MCP_APPROVE_FOR_ME=1` asks for the Chrome Safe Storage password once, then
+caches it in `~/.private/mcp-workers-bridge/chrome-safe-storage` with mode 600.
+Delete that file to revoke the cached approval. The first extraction still
+requires the macOS approval.
+
+`bridge_configuration` reports both `cookie_mode` and `approve_for_me`.
 
 ## 2. Extract cookies and set the environment variables
 
