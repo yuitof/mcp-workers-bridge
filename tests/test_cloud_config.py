@@ -56,12 +56,12 @@ def test_cloud_setup_installs_both_repository_components():
     assert "configure_trust.py" not in setup
     assert 'trust_level = "trusted"' in setup
     assert 'injected by .codex/setup.sh' in setup
-    assert 'repo_config="$(cat "$root/.codex/config.toml")"' in setup
+    assert 'MCP_LAUNCHER_LINE="$launcher_line" awk' in setup
     assert 'injected="${trust_section}"$' in setup
     assert '[[ "$user_config_content" == *"$injected"* ]]' in setup
     assert '${user_config_content%%"$marker"*}' in setup
     assert 'mv "$tmp_config" "$user_config"' in setup
-    assert 'cat "$root/.codex/config.toml"' in setup
+    assert "printf '%s\\n' \"$repo_config\"" in setup
 
 
 def test_make_targets_use_writable_caches():

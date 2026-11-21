@@ -48,7 +48,16 @@ marker='# mcp-workers-bridge (injected by .codex/setup.sh)'
 quoted_root="${root//\\/\\\\}"
 quoted_root="${quoted_root//\"/\\\"}"
 trust_section="$(printf '[projects."%s"]\ntrust_level = "trusted"\n' "$quoted_root")"
-repo_config="$(cat "$root/.codex/config.toml")"
+# Setup resolves the launcher once: the injected user-level config uses the
+# absolute checkout path instead of searching candidates on every start. The
+# checked-in project config keeps the portable fallback for local CLI use.
+launcher_line="  \"set -euo pipefail; exec \\\"$root/.venv/bin/mcp-workers-bridge\\\"\""
+repo_config="$(
+  MCP_LAUNCHER_LINE="$launcher_line" awk '
+    /set -euo pipefail; for candidate/ { print ENVIRON["MCP_LAUNCHER_LINE"]; next }
+    { print }
+  ' "$root/.codex/config.toml"
+)"
 injected="${trust_section}"$'\n'"${repo_config}"
 user_config_content="$(cat "$user_config" 2>/dev/null || true)"
 
@@ -61,7 +70,7 @@ elif [[ "$user_config_content" == *"$marker"* ]]; then
     printf '%s\n\n' "$marker"
     printf '%s' "$trust_section"
     printf '\n'
-    cat "$root/.codex/config.toml"
+    printf '%s\n' "$repo_config"
   } > "$tmp_config"
   chmod 600 "$tmp_config"
   mv "$tmp_config" "$user_config"
@@ -70,6 +79,6 @@ else
     printf '\n%s\n\n' "$marker"
     printf '%s' "$trust_section"
     printf '\n'
-    cat "$root/.codex/config.toml"
+    printf '%s\n' "$repo_config"
   } >> "$user_config"
 fi

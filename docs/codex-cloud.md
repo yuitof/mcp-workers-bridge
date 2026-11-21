@@ -46,7 +46,10 @@ present, everything from the marker to the end of the file is replaced with
 the current trust entry and repository configuration, so updates (including a
 moved checkout path) overwrite the previous block instead of duplicating it.
 When the marker is absent, the current trust entry and configuration are
-appended after it. Content before the marker is never modified.
+appended after it. The injected server definition resolves
+`.venv/bin/mcp-workers-bridge` to the absolute checkout path, while the
+checked-in project config keeps the portable candidate search for local CLI
+use. Content before the marker is never modified.
 
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
 npm, XDG state, and Wrangler logs. This avoids failures when Cloud mounts the
