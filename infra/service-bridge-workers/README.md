@@ -36,6 +36,117 @@ In the dashboard, review the existing Worker-level, account-wide and overlapping
 5. After edge Access checks pass, with approval enable `DIAGNOSTICS_ENABLED` in the private deployment configuration and deploy. Re-run Access checks against the new release and its preview before probes. If coverage fails, redeploy the checked-in disabled configuration immediately under the approved rollback. Disable previews after acceptance. Enable diagnostics only in an approved acceptance window. The client-controlled caption relay has its own `COMPARISON_ENABLED` switch. The authenticated collector relay has a separate `RELAY_ENABLED` switch. Use [the signed-out caption API](API.md#signed-out-caption-relay) and [fixed collector operations](API.md#read-only-collector-relay) only after confirming Access.
 6. Run the egress diagnostics and correlate Gateway logs before calling the caption endpoint. If either route fails, inspect the actual error and corresponding Gateway evidence. Resolve any policy issue with a separately reviewed proposal before proceeding. Account-wide Gateway configuration or policy changes need separate approval.
 
+## Detailed deployment commands
+
+Use Node 22.12+, 24, or 26+ and Terraform 1.7+. Authenticate Wrangler with a
+token that can write Workers:
+
+```sh
+cd infra/service-bridge-workers
+export CLOUDFLARE_ACCOUNT_ID="<account ID>"
+export CLOUDFLARE_API_TOKEN="<deployment token>"
+
+npm ci
+npm run check
+npm test
+npm run build
+npx wrangler whoami
+```
+
+For a new Worker, deploy the checked-in safe configuration first. It creates
+no public URL and keeps every route disabled:
+
+```sh
+npx wrangler deploy
+```
+
+Record the deployment ID privately. Use a read-only Cloudflare token with
+Worker and Access read permissions to obtain the stable Worker ID:
+
+```sh
+export CLOUDFLARE_API_TOKEN="<read-only inspection token>"
+npm run inspect
+```
+
+The Worker must exist before Terraform creates its Access application. Use the
+private state and reviewed-plan commands in
+[Private Terraform state](#private-terraform-state). Store the sensitive
+Terraform outputs directly in a private secret manager or environment
+configuration; do not print or commit them:
+
+```text
+service_token_client_id
+service_token_client_secret
+```
+
+Create the ignored private deployment profile from `wrangler.jsonc`:
+
+```sh
+cp wrangler.jsonc wrangler.acceptance.local.jsonc
+```
+
+For the first Access-test profile, leave diagnostics and relays disabled and
+enable both public surfaces:
+
+```json
+{
+  "workers_dev": true,
+  "preview_urls": true,
+  "vars": {
+    "DIAGNOSTICS_ENABLED": "false",
+    "COMPARISON_ENABLED": "false",
+    "RELAY_ENABLED": "false"
+  }
+}
+```
+
+Deploy it and test the production and version-preview URLs:
+
+```sh
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+
+export SERVICE_BRIDGE_WORKER_URL="https://service-bridge.<subdomain>.workers.dev"
+export SERVICE_BRIDGE_WORKER_PREVIEW_URL="<exact version preview URL>"
+export CF_ACCESS_CLIENT_ID="<from Terraform output>"
+export CF_ACCESS_CLIENT_SECRET="<from Terraform output>"
+
+npm run acceptance -- access
+```
+
+Missing and invalid credentials must be denied; valid credentials must reach
+the Worker. Then set `vars.DIAGNOSTICS_ENABLED` to `"true"` in the private
+configuration, redeploy, and verify Gateway egress and captions:
+
+```sh
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+npm run acceptance -- egress
+npm run acceptance -- captions
+```
+
+Finally restore `"DIAGNOSTICS_ENABLED": "false"`, set `"preview_urls": false`,
+and enable the operational routes:
+
+```json
+{
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "DIAGNOSTICS_ENABLED": "false",
+    "COMPARISON_ENABLED": "true",
+    "RELAY_ENABLED": "true"
+  }
+}
+```
+
+```sh
+npx wrangler deploy --config wrangler.acceptance.local.jsonc
+```
+
+To verify Access from Codex Cloud, run the acceptance script in the Cloud outer
+executor with `NODE_USE_ENV_PROXY=1` and the existing trusted proxy/CA
+configuration. An exact-hostname CONNECT denial occurs before the Worker or
+origin and is not an MCP authentication failure.
+
 ### Private Terraform state
 
 Use an isolated encrypted backend with locking and restricted access for an ongoing deployment. For a local evaluation, use an encrypted local directory outside the repository, mode 0700, with `umask 077`. Terraform variables, saved plan and state should all live there. Both state and plan may contain credentials regardless of CLI redaction. Do not enable Terraform debug tracing.
