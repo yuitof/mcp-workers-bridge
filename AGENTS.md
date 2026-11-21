@@ -19,14 +19,6 @@ the same `sandbox_permissions: require_escalated` setting.
 If a setup run fails, run it again with `sandbox_permissions:
 require_escalated` before treating the failure as a blocker.
 
-Before MCP-dependent work in Codex Cloud, confirm the environment provides:
-
-- `SERVICE_BRIDGE_WORKER_URL` = `https://service-bridge.<account-subdomain>.workers.dev`
-- `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` as HTTP secrets scoped
-  to that exact hostname
-
-Ask the user for any missing value. Never invent, echo, or commit them.
-
 Skip the run when `.venv/bin/mcp-workers-bridge` exists and
 `$CODEX_HOME/config.toml` already contains the repository's current trust
 entry and MCP server definition.
