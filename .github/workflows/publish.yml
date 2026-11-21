@@ -1,0 +1,78 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and build distributions
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install package, tests, and release tools
+        run: python -m pip install -e ".[test]" build twine
+
+      - name: Run Python tests
+        run: python -m pytest -q
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          package_version="$(python -c 'import mcp_workers_bridge; print(mcp_workers_bridge.__version__)')"
+          if [[ "${GITHUB_REF_NAME}" != "v${package_version}" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} must exactly match v${package_version}."
+            exit 1
+          fi
+          echo "Releasing version ${package_version}"
+
+      - name: Build source and wheel distributions
+        run: python -m build
+
+      - name: Check package metadata
+        run: python -m twine check dist/*
+
+      - name: Store package distributions
+        uses: actions/upload-artifact@v5
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to PyPI
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mcp-workers-bridge
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download package distributions
+        uses: actions/download-artifact@v6
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish package distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true

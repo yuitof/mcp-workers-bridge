@@ -537,7 +537,6 @@ wheels = [
 
 [[package]]
 name = "mcp-workers-bridge"
-version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },

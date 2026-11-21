@@ -1,13 +1,26 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-workers-bridge"
-version = "0.5.0"
-description = "MCP client and Cloudflare Worker setup for service bridge reads"
+dynamic = ["version"]
+description = "A stdio MCP server for authenticated YouTube, X, and Reddit reads"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
+keywords = ["mcp", "model-context-protocol", "youtube", "x", "reddit"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Internet :: WWW/HTTP",
+]
 dependencies = [
   "beautifulsoup4==4.14.3",
   "boto3==1.42.0",
@@ -17,11 +30,20 @@ dependencies = [
   "xclienttransaction==1.0.3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/yuitof/mcp-workers-bridge"
+Repository = "https://github.com/yuitof/mcp-workers-bridge"
+Issues = "https://github.com/yuitof/mcp-workers-bridge/issues"
+Documentation = "https://github.com/yuitof/mcp-workers-bridge/blob/main/docs/manual.md"
+
 [project.optional-dependencies]
 test = ["pytest==9.2.0"]
 
 [project.scripts]
 mcp-workers-bridge = "mcp_workers_bridge.server:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "mcp_workers_bridge.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
