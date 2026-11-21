@@ -34,33 +34,38 @@ codex_home="${CODEX_HOME:-$HOME/.codex}"
 mkdir -p "$codex_home"
 
 # Project-scoped MCP configuration is ignored unless the Cloud task trusts the
-# checkout in its persistent user-level Codex configuration.
-.venv/bin/python "$root/.codex/configure_trust.py" \
-  "$codex_home/config.toml" "$root"
-
-# Merge the project MCP table into the user-level Codex configuration so the
-# server is discoverable outside the trusted-project layer. The injected part
-# starts with the marker below; on later runs everything from the marker to the
-# end of the file is replaced with the current repository configuration, so an
-# updated repository configuration overwrites the previous block instead of
-# duplicating it. Content before the marker is never modified.
+# checkout in its persistent user-level Codex configuration. Setup injects both
+# a trust entry for this checkout and the repository configuration under one
+# marker. On every run, everything from the marker to the end of the file is
+# replaced, so updates overwrite the previous block instead of duplicating it.
+# Content before the marker is never modified.
 user_config="$codex_home/config.toml"
-repo_config="$(cat "$root/.codex/config.toml")"
 marker='# mcp-workers-bridge (injected by .codex/setup.sh)'
+quoted_root="${root//\\/\\\\}"
+quoted_root="${quoted_root//\"/\\\"}"
+trust_section="$(printf '[projects."%s"]\ntrust_level = "trusted"\n' "$quoted_root")"
+repo_config="$(cat "$root/.codex/config.toml")"
+injected="${trust_section}"$'\n'"${repo_config}"
 user_config_content="$(cat "$user_config" 2>/dev/null || true)"
 
-if [[ "$user_config_content" == *"$marker"* ]]; then
+if [[ "$user_config_content" == *"$injected"* ]]; then
+  :
+elif [[ "$user_config_content" == *"$marker"* ]]; then
   tmp_config="$user_config.tmp"
   {
     printf '%s' "${user_config_content%%"$marker"*}"
     printf '%s\n\n' "$marker"
+    printf '%s' "$trust_section"
+    printf '\n'
     cat "$root/.codex/config.toml"
   } > "$tmp_config"
   chmod 600 "$tmp_config"
   mv "$tmp_config" "$user_config"
-elif [[ "$user_config_content" != *"$repo_config"* ]]; then
+else
   {
     printf '\n%s\n\n' "$marker"
+    printf '%s' "$trust_section"
+    printf '\n'
     cat "$root/.codex/config.toml"
   } >> "$user_config"
 fi

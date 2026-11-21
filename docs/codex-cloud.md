@@ -14,11 +14,10 @@ bash .codex/setup.sh
 
 The script installs the locked Python environment and Worker npm dependencies.
 It does not collect history, read cookies, invoke the Worker, or deploy
-infrastructure. It also marks the checked-out workspace as trusted in the
-persistent Cloud Codex home, because project-scoped `.codex/config.toml` files
-are ignored for untrusted projects. Trust registration replaces
-`config.toml` atomically, so an existing read-only file is supported when its
-containing Codex home directory is writable.
+infrastructure. It also injects a `[projects."<checkout-path>"] trust_level =
+"trusted"` entry and the repository MCP table into the persistent Cloud Codex
+home, because project-scoped `.codex/config.toml` files are ignored for
+untrusted projects.
 
 The MCP launcher starts the server directly from the current checkout:
 it does not fetch or fast-forward `origin/main`, and `.codex/setup.sh` is not
@@ -28,14 +27,14 @@ it cannot interfere with the MCP JSON stream. Codex sends its normal MCP
 initialization request after the launcher transfers control to
 `.venv/bin/mcp-workers-bridge`.
 
-Setup also merges the project MCP table into the user-level
-`$CODEX_HOME/config.toml`. The injected part starts with the marker
+Setup injects the trust entry and the project MCP table into the user-level
+`$CODEX_HOME/config.toml` under the marker
 `# mcp-workers-bridge (injected by .codex/setup.sh)`. When the marker is
 present, everything from the marker to the end of the file is replaced with
-the current repository configuration, so updates overwrite the previous block
-instead of duplicating it. When the marker is absent, the current
-configuration is appended after it. Content before the marker is never
-modified.
+the current trust entry and repository configuration, so updates (including a
+moved checkout path) overwrite the previous block instead of duplicating it.
+When the marker is absent, the current trust entry and configuration are
+appended after it. Content before the marker is never modified.
 
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
 npm, and XDG state. This avoids failures when Cloud mounts the home-directory
@@ -134,8 +133,8 @@ available on every Cloud execution path; in that case this local-process MCP
 cannot be attached through Cloud settings alone. Use local Codex or a
 streamable-HTTP MCP deployment instead.
 
-If setup reports that both atomic replacement and direct write failed, the
-entire persistent Codex home is mounted read-only. In that case the environment
-must provision the `[projects."/absolute/checkout/path"] trust_level = "trusted"`
-entry before the task starts, or expose the MCP through a supported remote
-transport. The repository setup script cannot change a read-only mount.
+If setup fails while writing `config.toml`, the persistent Codex home is
+mounted read-only. In that case the environment must provision the
+`[projects."/absolute/checkout/path"] trust_level = "trusted"` entry before the
+task starts, or expose the MCP through a supported remote transport. The
+repository setup script cannot change a read-only mount.

@@ -1,7 +1,4 @@
 from pathlib import Path
-import stat
-import subprocess
-import sys
 import tomllib
 
 
@@ -54,70 +51,12 @@ def test_cloud_setup_installs_both_repository_components():
     assert 'export npm_config_cache="$setup_cache/npm"' in setup
     assert "mktemp -d /tmp/mcp-workers-bridge-setup" in setup
     assert 'CODEX_HOME' in setup
-    assert "configure_trust.py" in setup
+    assert "configure_trust.py" not in setup
+    assert 'trust_level = "trusted"' in setup
     assert 'injected by .codex/setup.sh' in setup
     assert 'repo_config="$(cat "$root/.codex/config.toml")"' in setup
-    assert '[[ "$user_config_content" != *"$repo_config"* ]]' in setup
+    assert 'injected="${trust_section}"$' in setup
+    assert '[[ "$user_config_content" == *"$injected"* ]]' in setup
     assert '${user_config_content%%"$marker"*}' in setup
     assert 'mv "$tmp_config" "$user_config"' in setup
     assert 'cat "$root/.codex/config.toml"' in setup
-
-    trust = (ROOT / ".codex/configure_trust.py").read_text()
-    assert 'trust_level = "trusted"' in trust
-
-
-def test_cloud_trust_replaces_read_only_config(tmp_path):
-    config = tmp_path / "config.toml"
-    config.write_text(
-        '[model_providers.existing]\nname = "fixture"\n',
-        encoding="utf-8",
-    )
-    config.chmod(0o444)
-    project = tmp_path / "project"
-    project.mkdir()
-
-    subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / ".codex/configure_trust.py"),
-            str(config),
-            str(project),
-        ],
-        check=True,
-    )
-
-    parsed = tomllib.loads(config.read_text(encoding="utf-8"))
-    assert parsed["model_providers"]["existing"]["name"] == "fixture"
-    assert parsed["projects"][str(project)]["trust_level"] == "trusted"
-    assert stat.S_IMODE(config.stat().st_mode) == 0o600
-
-
-def test_cloud_trust_accepts_existing_read_only_trust_entry(tmp_path):
-    project = tmp_path / "project"
-    project.mkdir()
-    config = tmp_path / "config.toml"
-    config.write_text(
-        f'[projects.{project.as_posix()!r}]\n'
-        "trust_level = 'trusted'\n"
-        'existing_setting = "preserved"\n',
-        encoding="utf-8",
-    )
-    config.chmod(0o444)
-    inode = config.stat().st_ino
-
-    subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / ".codex/configure_trust.py"),
-            str(config),
-            str(project),
-        ],
-        check=True,
-    )
-
-    assert config.stat().st_ino == inode
-    parsed = tomllib.loads(config.read_text(encoding="utf-8"))
-    assert parsed["projects"][str(project)] == {
-        "trust_level": "trusted",
-        "existing_setting": "preserved",
-    }
