@@ -13,9 +13,9 @@ def test_project_mcp_definition_uses_cloud_safe_launcher():
     assert "git fetch origin main" not in server["args"][1]
     assert "git merge --ff-only origin/main" not in server["args"][1]
     assert "bash \"$root/.codex/setup.sh\"" not in server["args"][1]
-    assert server["args"][1].endswith(
-        'exec "$root/.venv/bin/mcp-workers-bridge"'
-    )
+    assert '"$PWD"' in server["args"][1]
+    assert '"$PWD/mcp-workers-bridge"' in server["args"][1]
+    assert 'exec "$candidate/.venv/bin/mcp-workers-bridge"' in server["args"][1]
     assert server["startup_timeout_sec"] == 30
     assert server["tool_timeout_sec"] == 300
 
@@ -49,6 +49,8 @@ def test_cloud_setup_installs_both_repository_components():
     assert 'export UV_CACHE_DIR="$setup_cache/uv"' in setup
     assert 'export UV_PYTHON_INSTALL_DIR="$setup_cache/python"' in setup
     assert 'export npm_config_cache="$setup_cache/npm"' in setup
+    assert 'export XDG_CONFIG_HOME="$setup_cache/xdg-config"' in setup
+    assert 'export WRANGLER_LOG_PATH="$setup_cache/wrangler/logs"' in setup
     assert "mktemp -d /tmp/mcp-workers-bridge-setup" in setup
     assert 'CODEX_HOME' in setup
     assert "configure_trust.py" not in setup
@@ -60,3 +62,18 @@ def test_cloud_setup_installs_both_repository_components():
     assert '${user_config_content%%"$marker"*}' in setup
     assert 'mv "$tmp_config" "$user_config"' in setup
     assert 'cat "$root/.codex/config.toml"' in setup
+
+
+def test_make_targets_use_writable_caches():
+    makefile = (ROOT / "Makefile").read_text()
+    assert "BRIDGE_CACHE := $(CURDIR)/.cache/workers" in makefile
+    assert 'npm_config_cache="$${npm_config_cache:-$(BRIDGE_CACHE)/npm}"' in makefile
+    assert (
+        'XDG_CONFIG_HOME="$${XDG_CONFIG_HOME:-$(BRIDGE_CACHE)/xdg-config}"'
+        in makefile
+    )
+    assert (
+        'WRANGLER_LOG_PATH="$${WRANGLER_LOG_PATH:-$(BRIDGE_CACHE)/wrangler/logs}"'
+        in makefile
+    )
+    assert ".cache/" in (ROOT / ".gitignore").read_text()

@@ -19,13 +19,15 @@ infrastructure. It also injects a `[projects."<checkout-path>"] trust_level =
 home, because project-scoped `.codex/config.toml` files are ignored for
 untrusted projects.
 
-The MCP launcher starts the server directly from the current checkout:
-it does not fetch or fast-forward `origin/main`, and `.codex/setup.sh` is not
-run by the launcher. Pull latest code and run setup manually when dependencies
-or project trust need to be updated. Bootstrap output is written to stderr so
-it cannot interfere with the MCP JSON stream. Codex sends its normal MCP
-initialization request after the launcher transfers control to
-`.venv/bin/mcp-workers-bridge`.
+The MCP launcher starts the server directly from the checkout. It resolves the
+repository with `git rev-parse --show-toplevel` and falls back to `$PWD` and
+`$PWD/mcp-workers-bridge`, so it still finds the checkout when Codex runs from
+the parent directory. It does not fetch or fast-forward `origin/main`, and
+`.codex/setup.sh` is not run by the launcher. Pull latest code and run setup
+manually when dependencies or project trust need to be updated. Bootstrap
+output is written to stderr so it cannot interfere with the MCP JSON stream.
+Codex sends its normal MCP initialization request after the launcher transfers
+control to `.venv/bin/mcp-workers-bridge`.
 
 Setup injects the trust entry and the project MCP table into the user-level
 `$CODEX_HOME/config.toml` under the marker
@@ -37,9 +39,18 @@ When the marker is absent, the current trust entry and configuration are
 appended after it. Content before the marker is never modified.
 
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
-npm, and XDG state. This avoids failures when Cloud mounts the home-directory
-cache read-only. Set `MCP_WORKERS_BRIDGE_SETUP_CACHE` to another writable
-absolute directory if `/tmp` is unavailable in your environment.
+npm, XDG state, and Wrangler logs. This avoids failures when Cloud mounts the
+home-directory cache or `$HOME/.config` read-only. Set
+`MCP_WORKERS_BRIDGE_SETUP_CACHE` to another writable absolute directory if
+`/tmp` is unavailable in your environment.
+
+The `Makefile` targets default the same state to `.cache/workers` in the
+checkout when the variables are unset, so `make install`, `make worker-build`,
+and `make check` also work when `$HOME/.config` and the default npm cache are
+read-only. For Wrangler commands run outside make, export `XDG_CONFIG_HOME` and
+`WRANGLER_LOG_PATH` to writable paths. `make check` does not include
+`terraform-check`; Terraform is only needed for `make terraform-check` and the
+deployment runbook.
 
 ## Environment variables
 

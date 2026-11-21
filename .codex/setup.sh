@@ -18,12 +18,16 @@ export UV_PYTHON_INSTALL_DIR="$setup_cache/python"
 export UV_TOOL_DIR="$setup_cache/tools"
 export npm_config_cache="$setup_cache/npm"
 export XDG_CACHE_HOME="$setup_cache/xdg"
+export XDG_CONFIG_HOME="$setup_cache/xdg-config"
+export WRANGLER_LOG_PATH="$setup_cache/wrangler/logs"
 mkdir -p \
   "$UV_CACHE_DIR" \
   "$UV_PYTHON_INSTALL_DIR" \
   "$UV_TOOL_DIR" \
   "$npm_config_cache" \
-  "$XDG_CACHE_HOME"
+  "$XDG_CACHE_HOME" \
+  "$XDG_CONFIG_HOME" \
+  "$WRANGLER_LOG_PATH"
 
 uv sync --system-certs --extra test
 npm --prefix infra/service-bridge-workers ci

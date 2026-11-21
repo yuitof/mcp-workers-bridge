@@ -28,6 +28,9 @@ make check
 
 Or run them separately with `make python-test`, `make worker-check`, `make worker-test`, `make worker-build`, and `make terraform-check`.
 
+Terraform 1.7+ is only required for `make terraform-check` and the deployment
+runbook; `make check` does not run Terraform.
+
 The repository also includes a project-scoped Codex MCP configuration and Cloud
 setup script. See [docs/codex-cloud.md](docs/codex-cloud.md) for environment
 variables, secret scopes, OIDC/S3 permissions, publishing, and verification.

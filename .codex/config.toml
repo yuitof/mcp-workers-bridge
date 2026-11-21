@@ -2,7 +2,7 @@
 command = "/bin/bash"
 args = [
   "-c",
-  "set -euo pipefail; root=$(git rev-parse --show-toplevel); cd \"$root\"; exec \"$root/.venv/bin/mcp-workers-bridge\""
+  "set -euo pipefail; for candidate in \"$(git rev-parse --show-toplevel 2>/dev/null || true)\" \"$PWD\" \"$PWD/mcp-workers-bridge\"; do if [ -n \"$candidate\" ] && [ -x \"$candidate/.venv/bin/mcp-workers-bridge\" ]; then cd \"$candidate\"; exec \"$candidate/.venv/bin/mcp-workers-bridge\"; fi; done; echo \"mcp-workers-bridge launcher not found\" >&2; exit 1"
 ]
 startup_timeout_sec = 30
 tool_timeout_sec = 300
