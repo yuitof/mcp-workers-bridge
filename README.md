@@ -25,6 +25,10 @@ Recommended PyPI registration:
 codex mcp add workers-bridge -- uvx mcp-workers-bridge
 ```
 
+This registers a stdio server named `workers-bridge`. Codex stores `uvx` as
+the command and `mcp-workers-bridge` as its argument; at MCP startup, uvx
+resolves and runs the published package.
+
 Chrome cookie extraction is included in the default install. Codex runs the
 published package on demand.
 
@@ -35,12 +39,10 @@ MCP server. Restart Codex after changing the config or environment.
 
 ### Modes
 
-Set mode values in the MCP server entry in `~/.codex/config.toml`:
+Set mode values in the MCP server entry in `~/.codex/config.toml`.
 
-```toml
-[mcp_servers.workers-bridge]
-env = { MCP_WITHOUT_COOKIE = "1" }
-```
+To enable without-cookie mode, add `MCP_WITHOUT_COOKIE = "1"` to that table's
+`env` map.
 
 `MCP_WITHOUT_COOKIE=1` hides every cookie-backed tool at startup. It exposes
 only `bridge_configuration`, `workers_bridge_probe`,
@@ -48,102 +50,55 @@ only `bridge_configuration`, `workers_bridge_probe`,
 `clear_cache`.
 
 ```toml
+[mcp_servers.workers-bridge]
+command = "uvx"
+args = ["mcp-workers-bridge"]
 env = { MCP_APPROVE_FOR_ME = "1" }
 ```
 
+`env` values are literal TOML values, so no shell expansion is involved.
 `MCP_APPROVE_FOR_ME=1` asks for the Chrome Safe Storage password once, then
 caches it in `~/.private/mcp-workers-bridge/chrome-safe-storage` with mode 600.
 Delete that file to revoke the cached approval. The first extraction still
-requires the macOS approval.
+requires the macOS approval. Restart Codex after editing the table.
 
 `bridge_configuration` reports both `cookie_mode` and `approve_for_me`.
 
 ## 2. Extract cookies and set the environment variables
 
-Cookies are full account credentials. Keep the values private, never commit
-them, and never paste them into chat.
-
-Declare these variables inside the Codex session, in the same terminal or app
-environment that launches it:
-
-The variables are optional. Cookie-backed tools require a `profile` argument
-such as `Default` or `Profile 1`. If the matching profile is absent from the
-storage-state variable, the tool extracts that profile from Chrome on macOS and
-caches the cookies in the MCP process. This requires `mcp-workers-bridge`
-0.7.0 or newer.
-
-One storage-state variable can hold several profiles:
-
-```json
-{
-  "profiles": {
-    "Default": {"cookies": [...]},
-    "Profile 1": {"cookies": [...]}
-  }
-}
-```
-
-Call `clear_cookie_state` to remove selected cookies from the running MCP:
-
-```json
-{"service": "x", "profile": "Profile 1"}
-```
-
-Omit `service` or `profile` to clear more broadly. Clearing is process-local;
-restarting Codex restores values inherited from its environment.
-
-Clear cache artifacts with `clear_cache`:
-
-```json
-{"target": "both", "service": "youtube"}
-```
-
-`target` accepts `local`, `s3`, or `both`. Local clearing removes
-`history.json` and `transcripts/` but leaves `auth/` untouched; S3 clearing
-removes only the `youtube/` prefix.
-
-Direct mode needs only the storage-state variable for each service you use:
+Direct mode uses these variables:
 
 | Data | Minimum variable |
 | --- | --- |
 | YouTube history | `YOUTUBE_STORAGE_STATE_JSON` |
 | X | `X_STORAGE_STATE_JSON` |
 | Reddit | `REDDIT_STORAGE_STATE_JSON` |
+| YouTube local cache | `LOCAL_CACHE_ROOT` |
 | YouTube captions only | none |
 
-### Bundled exporter (macOS)
+### Local cache
 
-Extract each service directly into its environment variable with uvx. This
-requires `mcp-workers-bridge` 0.7.0 or newer:
+Declare the cache root as a literal value in the MCP server’s `env` table:
 
-```bash
-export YOUTUBE_STORAGE_STATE_JSON="$(
-  uvx --system-certs --from mcp-workers-bridge \
-    chrome-storage-state youtube --profile "Default" --stdout
-)"
-export X_STORAGE_STATE_JSON="$(
-  uvx --system-certs --from mcp-workers-bridge \
-    chrome-storage-state x --profile "Default" --stdout
-)"
-export REDDIT_STORAGE_STATE_JSON="$(
-  uvx --system-certs --from mcp-workers-bridge \
-    chrome-storage-state reddit --profile "Default" --stdout
-)"
+```toml
+[mcp_servers.workers-bridge]
+command = "uvx"
+args = ["mcp-workers-bridge"]
+env = { LOCAL_CACHE_ROOT = "/path/to/private-cache-root" }
+```
+
+TOML does not expand `$HOME` or `$VAR`, so use an absolute path. Combine values
+in the same map when needed:
+
+```toml
+env = { LOCAL_CACHE_ROOT = "/path/to/private-cache-root", MCP_APPROVE_FOR_ME = "1" }
 ```
 
 ## 3. Verify the connection
 
-In a Codex CLI session, run `/mcp` and confirm the server is connected. Then:
-
-1. Call `bridge_configuration` and confirm `mode` is `direct`.
-2. Call `workers_youtube_captions` with `"dQw4w9WgXcQ"` (no session needed).
-3. Call `workers_youtube_history` with `profile: "Default"` and
-   `refresh=false` before the first refresh, then with `refresh=true`.
-4. Call `workers_x_home` and `workers_reddit_identity` with
-   `profile: "Default"`.
-
-Missing sessions produce a per-tool configuration error; they do not prevent
-the server from starting.
+```bash
+codex mcp list
+```
 
 ## Documentation
 

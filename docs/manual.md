@@ -21,6 +21,9 @@ export X_STORAGE_STATE_JSON='...'
 export REDDIT_STORAGE_STATE_JSON='...'
 ```
 
+In Codex `config.toml`, declare values in the MCP server’s `env` map as
+literals; TOML does not expand `$HOME` or other environment variables.
+
 `SERVICE_BRIDGE_WORKER_URL` and the Access pair are optional. When all three
 are absent, the MCP runs in direct mode and connects to the destination hosts
 directly with the supplied storage-state sessions. `bridge_configuration`
