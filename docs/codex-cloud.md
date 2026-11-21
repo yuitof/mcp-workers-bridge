@@ -46,8 +46,9 @@ home-directory cache or `$HOME/.config` read-only. Set
 
 The `Makefile` targets default the same state to `.cache/workers` in the
 checkout when the variables are unset, so `make install`, `make worker-build`,
-and `make check` also work when `$HOME/.config` and the default npm cache are
-read-only. For Wrangler commands run outside make, export `XDG_CONFIG_HOME` and
+and `make check` (including its `uv lock --check` step) also work when
+`$HOME/.config`, the default uv cache, and the default npm cache are read-only.
+For Wrangler commands run outside make, export `XDG_CONFIG_HOME` and
 `WRANGLER_LOG_PATH` to writable paths. `make check` does not include
 `terraform-check`; Terraform is only needed for `make terraform-check` and the
 deployment runbook.

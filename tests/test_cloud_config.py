@@ -76,4 +76,9 @@ def test_make_targets_use_writable_caches():
         'WRANGLER_LOG_PATH="$${WRANGLER_LOG_PATH:-$(BRIDGE_CACHE)/wrangler/logs}"'
         in makefile
     )
+    assert (
+        'UV_TOOL_DIR="$${UV_TOOL_DIR:-$(BRIDGE_CACHE)/tools}" \\\n'
+        "\tuv lock --check"
+        in makefile
+    )
     assert ".cache/" in (ROOT / ".gitignore").read_text()

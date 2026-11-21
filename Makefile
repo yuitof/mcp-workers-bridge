@@ -16,6 +16,9 @@ install:
 	npm --prefix $(WORKER_DIR) ci
 
 check: python-test worker-check worker-test worker-build
+	UV_CACHE_DIR="$${UV_CACHE_DIR:-$(BRIDGE_CACHE)/uv}" \
+	UV_PYTHON_INSTALL_DIR="$${UV_PYTHON_INSTALL_DIR:-$(BRIDGE_CACHE)/python}" \
+	UV_TOOL_DIR="$${UV_TOOL_DIR:-$(BRIDGE_CACHE)/tools}" \
 	uv lock --check
 	git diff --check
 
