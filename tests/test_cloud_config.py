@@ -13,13 +13,13 @@ def test_project_mcp_definition_uses_cloud_safe_launcher():
     server = config["mcp_servers"]["workers-bridge-cloud"]
     assert server["command"] == "/bin/bash"
     assert "git rev-parse --show-toplevel" in server["args"][1]
-    assert "git fetch origin main" in server["args"][1]
-    assert "git merge --ff-only origin/main" in server["args"][1]
+    assert "git fetch origin main" not in server["args"][1]
+    assert "git merge --ff-only origin/main" not in server["args"][1]
     assert "bash \"$root/.codex/setup.sh\"" not in server["args"][1]
     assert server["args"][1].endswith(
         'exec "$root/.venv/bin/mcp-workers-bridge"'
     )
-    assert server["startup_timeout_sec"] == 600
+    assert server["startup_timeout_sec"] == 30
     assert server["tool_timeout_sec"] == 300
 
 
@@ -56,6 +56,10 @@ def test_cloud_setup_installs_both_repository_components():
     assert 'CODEX_HOME' in setup
     assert "configure_trust.py" in setup
     assert 'injected by .codex/setup.sh' in setup
+    assert 'repo_config="$(cat "$root/.codex/config.toml")"' in setup
+    assert '[[ "$user_config_content" != *"$repo_config"* ]]' in setup
+    assert '${user_config_content%%"$marker"*}' in setup
+    assert 'mv "$tmp_config" "$user_config"' in setup
     assert 'cat "$root/.codex/config.toml"' in setup
 
     trust = (ROOT / ".codex/configure_trust.py").read_text()

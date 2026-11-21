@@ -39,11 +39,28 @@ mkdir -p "$codex_home"
   "$codex_home/config.toml" "$root"
 
 # Merge the project MCP table into the user-level Codex configuration so the
-# server is discoverable outside the trusted-project layer. Append once only.
+# server is discoverable outside the trusted-project layer. The injected part
+# starts with the marker below; on later runs everything from the marker to the
+# end of the file is replaced with the current repository configuration, so an
+# updated repository configuration overwrites the previous block instead of
+# duplicating it. Content before the marker is never modified.
 user_config="$codex_home/config.toml"
-if ! grep -q '^# mcp-workers-bridge (injected by .codex/setup.sh)$' "$user_config" 2>/dev/null; then
+repo_config="$(cat "$root/.codex/config.toml")"
+marker='# mcp-workers-bridge (injected by .codex/setup.sh)'
+user_config_content="$(cat "$user_config" 2>/dev/null || true)"
+
+if [[ "$user_config_content" == *"$marker"* ]]; then
+  tmp_config="$user_config.tmp"
   {
-    printf '\n# mcp-workers-bridge (injected by .codex/setup.sh)\n'
+    printf '%s' "${user_config_content%%"$marker"*}"
+    printf '%s\n\n' "$marker"
+    cat "$root/.codex/config.toml"
+  } > "$tmp_config"
+  chmod 600 "$tmp_config"
+  mv "$tmp_config" "$user_config"
+elif [[ "$user_config_content" != *"$repo_config"* ]]; then
+  {
+    printf '\n%s\n\n' "$marker"
     cat "$root/.codex/config.toml"
   } >> "$user_config"
 fi

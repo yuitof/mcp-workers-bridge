@@ -20,17 +20,22 @@ are ignored for untrusted projects. Trust registration replaces
 `config.toml` atomically, so an existing read-only file is supported when its
 containing Codex home directory is writable.
 
-The MCP launcher refreshes the checkout before every startup: it fast-forwards
-`origin/main` and then starts the MCP server. `.codex/setup.sh` is not run by
-the launcher and must be run manually when dependencies or project trust need
-to be updated. Bootstrap output is written to stderr so it cannot interfere
-with the MCP JSON stream. Codex sends its normal MCP initialization request
-after the launcher transfers control to `.venv/bin/mcp-workers-bridge`.
+The MCP launcher starts the server directly from the current checkout:
+it does not fetch or fast-forward `origin/main`, and `.codex/setup.sh` is not
+run by the launcher. Pull latest code and run setup manually when dependencies
+or project trust need to be updated. Bootstrap output is written to stderr so
+it cannot interfere with the MCP JSON stream. Codex sends its normal MCP
+initialization request after the launcher transfers control to
+`.venv/bin/mcp-workers-bridge`.
 
 Setup also merges the project MCP table into the user-level
-`$CODEX_HOME/config.toml` once. The injected block is marked with
-`# mcp-workers-bridge (injected by .codex/setup.sh)` and is not appended again
-on later runs, so the user-level configuration remains valid TOML.
+`$CODEX_HOME/config.toml`. The injected part starts with the marker
+`# mcp-workers-bridge (injected by .codex/setup.sh)`. When the marker is
+present, everything from the marker to the end of the file is replaced with
+the current repository configuration, so updates overwrite the previous block
+instead of duplicating it. When the marker is absent, the current
+configuration is appended after it. Content before the marker is never
+modified.
 
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
 npm, and XDG state. This avoids failures when Cloud mounts the home-directory
