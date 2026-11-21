@@ -29,7 +29,7 @@ async function all(path) {
   }
 }
 
-const workerName = "service-bridge-workers";
+const workerName = "service-bridge";
 const sections = {
   worker: async () => {
     const row = (await all("/workers/workers")).find(item => item.name === workerName);

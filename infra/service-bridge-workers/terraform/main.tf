@@ -21,7 +21,7 @@ variable "account_id" {
 
 variable "worker_id" {
   type        = string
-  description = "Stable ID of the existing, disabled service-bridge-workers Worker."
+  description = "Stable ID of the existing, disabled service-bridge Worker."
   validation {
     condition     = can(regex("^[a-f0-9]{32}$", var.worker_id))
     error_message = "Worker ID must be the 32-character stable ID, such as the script tag."
@@ -30,7 +30,7 @@ variable "worker_id" {
 
 resource "cloudflare_zero_trust_access_service_token" "diagnostics" {
   account_id = var.account_id
-  name       = "service-bridge-workers-diagnostics"
+  name       = "service-bridge-diagnostics"
   duration   = "168h"
 
   lifecycle {
@@ -40,7 +40,7 @@ resource "cloudflare_zero_trust_access_service_token" "diagnostics" {
 
 resource "cloudflare_zero_trust_access_application" "diagnostics" {
   account_id           = var.account_id
-  name                 = "service-bridge-workers-diagnostics"
+  name                 = "service-bridge-diagnostics"
   type                 = "self_hosted"
   app_launcher_visible = false
 

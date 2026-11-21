@@ -68,10 +68,15 @@ deployment runbook.
 
 ## Environment variables
 
+Codex Cloud setup must fill `SERVICE_BRIDGE_WORKER_URL`,
+`CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` before publishing the
+environment. Ask the user for any missing value; never generate, echo, or
+commit the Access secrets.
+
 Add these ordinary environment variables:
 
 ```text
-SERVICE_BRIDGE_WORKER_URL=https://service-bridge-workers.english-vault-bridge.workers.dev
+SERVICE_BRIDGE_WORKER_URL=https://service-bridge.<account-subdomain>.workers.dev
 YOUTUBE_TIMEZONE=Europe/London
 YOUTUBE_CACHE_DIR=/tmp/workers-bridge/youtube
 YOUTUBE_CACHE_BUCKET=english-vault-youtube-cache-cachebucket-giafchlzhpuf
@@ -94,7 +99,7 @@ repository or environment documentation.
 Add the Cloudflare Access pair as HTTP secrets, each allowed for:
 
 ```text
-service-bridge-workers.english-vault-bridge.workers.dev
+service-bridge.<account-subdomain>.workers.dev
 ```
 
 ```text

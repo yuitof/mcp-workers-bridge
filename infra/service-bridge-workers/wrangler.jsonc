@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "service-bridge-workers",
+  "name": "service-bridge",
   "main": "src/signed-out-comparison.ts",
   "compatibility_date": "2026-11-19",
   "workers_dev": false,

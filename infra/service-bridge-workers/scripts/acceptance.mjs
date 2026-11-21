@@ -12,7 +12,7 @@ if (!["access", "egress", "captions"].includes(run) ||
 function endpoint(raw, preview = false) {
   const url = new URL(raw);
   const prefix = preview ? "[a-z0-9-]+-" : "";
-  const host = new RegExp(`^${prefix}service-bridge-workers\\.[a-z0-9-]+\\.workers\\.dev$`);
+  const host = new RegExp(`^${prefix}service-bridge\\.[a-z0-9-]+\\.workers\\.dev$`);
   if (url.protocol !== "https:" || !host.test(url.hostname) || url.port ||
       url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error();
   return url.origin;

@@ -42,7 +42,7 @@ Use the MCP client's environment configuration or export these variables in the 
 ### Workers bridge
 
 ```bash
-export SERVICE_BRIDGE_WORKER_URL=https://service-bridge-workers.example.workers.dev
+export SERVICE_BRIDGE_WORKER_URL=https://service-bridge.example.workers.dev
 export CF_ACCESS_CLIENT_ID=...
 export CF_ACCESS_CLIENT_SECRET=...
 export WORKERS_BRIDGE_TIMEOUT_SECONDS=50
@@ -168,7 +168,7 @@ Deploy it and test the production and version-preview URLs:
 ```bash
 npx wrangler deploy --config wrangler.acceptance.local.jsonc
 
-export SERVICE_BRIDGE_WORKER_URL="https://service-bridge-workers.<subdomain>.workers.dev"
+export SERVICE_BRIDGE_WORKER_URL="https://service-bridge.<subdomain>.workers.dev"
 export SERVICE_BRIDGE_WORKER_PREVIEW_URL="<exact version preview URL>"
 export CF_ACCESS_CLIENT_ID="<from Terraform output>"
 export CF_ACCESS_CLIENT_SECRET="<from Terraform output>"
