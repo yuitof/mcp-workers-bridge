@@ -26,6 +26,11 @@ Bootstrap and setup output is written to stderr so it cannot interfere with the
 MCP JSON stream. Codex sends its normal MCP initialization request after the
 launcher transfers control to `.venv/bin/mcp-workers-bridge`.
 
+Setup also merges the project MCP table into the user-level
+`$CODEX_HOME/config.toml` once. The injected block is marked with
+`# mcp-workers-bridge (injected by .codex/setup.sh)` and is not appended again
+on later runs, so the user-level configuration remains valid TOML.
+
 Setup uses a writable cache under `/tmp` for uv, uv-managed Python/tool files,
 npm, and XDG state. This avoids failures when Cloud mounts the home-directory
 cache read-only. Set `MCP_WORKERS_BRIDGE_SETUP_CACHE` to another writable

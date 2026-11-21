@@ -37,3 +37,13 @@ mkdir -p "$codex_home"
 # checkout in its persistent user-level Codex configuration.
 .venv/bin/python "$root/.codex/configure_trust.py" \
   "$codex_home/config.toml" "$root"
+
+# Merge the project MCP table into the user-level Codex configuration so the
+# server is discoverable outside the trusted-project layer. Append once only.
+user_config="$codex_home/config.toml"
+if ! grep -q '^# mcp-workers-bridge (injected by .codex/setup.sh)$' "$user_config" 2>/dev/null; then
+  {
+    printf '\n# mcp-workers-bridge (injected by .codex/setup.sh)\n'
+    cat "$root/.codex/config.toml"
+  } >> "$user_config"
+fi

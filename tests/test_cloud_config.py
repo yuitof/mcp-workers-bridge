@@ -55,6 +55,8 @@ def test_cloud_setup_installs_both_repository_components():
     assert "mktemp -d /tmp/mcp-workers-bridge-setup" in setup
     assert 'CODEX_HOME' in setup
     assert "configure_trust.py" in setup
+    assert 'injected by .codex/setup.sh' in setup
+    assert 'cat "$root/.codex/config.toml"' in setup
 
     trust = (ROOT / ".codex/configure_trust.py").read_text()
     assert 'trust_level = "trusted"' in trust
