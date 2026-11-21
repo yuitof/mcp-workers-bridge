@@ -259,6 +259,26 @@ def test_page_cap_returns_visible_partial_coverage():
     assert output["coverage"]["range_complete"] is False
 
 
+def test_refresh_without_worker_uses_direct_transport(monkeypatch):
+    class Direct(FakeWorkersClient):
+        def __init__(self, state):
+            pass
+
+    monkeypatch.setattr(history, "DirectRelay", Direct)
+    current = today()
+    FakeWorkersClient.pages = [result(page([section("Today")], initial=True))]
+
+    output = history.youtube_history(
+        None,
+        since=str(current),
+        max_pages=1,
+        timezone_name=ZONE,
+    )
+
+    assert output["ok"] is True
+    assert [call[1] for call in FakeWorkersClient.calls] == ["history", "browse"]
+
+
 def test_refresh_checkpoints_vault_compatible_local_history(monkeypatch, tmp_path):
     monkeypatch.setattr(history.time, "sleep", lambda _: None)
     current = today()

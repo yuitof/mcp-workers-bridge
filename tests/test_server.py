@@ -119,3 +119,54 @@ def test_youtube_history_cache_only_does_not_require_worker_config(monkeypatch):
         "refresh": False,
         "cache_enabled": True,
     }
+
+
+def test_bridge_configuration_reports_direct_mode_without_worker(monkeypatch):
+    for name in (
+        "SERVICE_BRIDGE_WORKER_URL",
+        "WORKERS_BRIDGE_URL",
+        "CF_ACCESS_CLIENT_ID",
+        "CF_ACCESS_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    result = server.bridge_configuration()
+    assert result["mode"] == "direct"
+    assert result["workers"]["configured"] is False
+
+
+def test_probe_reports_direct_mode_without_worker(monkeypatch):
+    for name in (
+        "SERVICE_BRIDGE_WORKER_URL",
+        "WORKERS_BRIDGE_URL",
+        "CF_ACCESS_CLIENT_ID",
+        "CF_ACCESS_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    result = server.workers_bridge_probe()
+    assert result["error"] == "workers_not_configured"
+    assert result["mode"] == "direct"
+
+
+def test_captions_use_direct_transport_without_worker(monkeypatch):
+    for name in (
+        "SERVICE_BRIDGE_WORKER_URL",
+        "WORKERS_BRIDGE_URL",
+        "CF_ACCESS_CLIENT_ID",
+        "CF_ACCESS_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        server,
+        "direct_captions",
+        lambda video_id, include_segments, max_segments: {
+            "ok": True,
+            "transport": "direct",
+            "video_id": video_id,
+        },
+    )
+    result = server.workers_youtube_captions("dQw4w9WgXcQ")
+    assert result == {
+        "ok": True,
+        "transport": "direct",
+        "video_id": "dQw4w9WgXcQ",
+    }

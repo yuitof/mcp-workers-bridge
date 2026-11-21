@@ -1,4 +1,4 @@
-"""Private Cookie-backed X and Reddit operations over the Worker relay."""
+"""Private Cookie-backed X and Reddit operations over the Worker or directly."""
 
 from email.message import Message
 import json
@@ -34,6 +34,177 @@ ENV_NAMES = {
     "x": "X_STORAGE_STATE_JSON",
     "reddit": "REDDIT_STORAGE_STATE_JSON",
 }
+X_ASSET_BASE = "https://abs.twimg.com/responsive-web/client-web/"
+
+
+def _direct_timeout() -> float:
+    raw = os.environ.get("WORKERS_BRIDGE_TIMEOUT_SECONDS", "50")
+    try:
+        value = float(raw)
+    except ValueError:
+        return 50.0
+    return value if 1 <= value <= 600 else 50.0
+
+
+def direct_target(
+    service: str,
+    operation: str,
+    parameters: dict,
+    query: str,
+):
+    if service == "x":
+        if operation == "home":
+            return "GET", "https://x.com/home"
+        if operation == "graphql":
+            return (
+                "GET",
+                "https://x.com/i/api/graphql/"
+                f"{parameters['queryId']}/{parameters['operationName']}?{query}",
+            )
+        if operation == "asset":
+            return "GET", X_ASSET_BASE + parameters["asset"]
+    if service == "reddit":
+        if operation == "identity":
+            return "GET", "https://old.reddit.com/api/me.json"
+        if operation == "listing":
+            params = {"limit": "100", "raw_json": "1"}
+            if parameters.get("after"):
+                params["after"] = parameters["after"]
+            return (
+                "GET",
+                "https://old.reddit.com/user/"
+                f"{parameters['account']}/{parameters['collection']}.json?"
+                f"{urlencode(params)}",
+            )
+        if operation == "comments":
+            path = urlsplit(parameters["permalink"]).path.rstrip("/") + "/"
+            return "GET", f"https://old.reddit.com{path}?context=0"
+    if service == "youtube":
+        if operation == "history":
+            return "GET", "https://www.youtube.com/feed/history?hl=en"
+        if operation == "browse":
+            return (
+                "POST",
+                f"https://www.youtube.com/youtubei/v1/browse?{query}",
+            )
+    raise BridgeError("unsupported_operation", "Unsupported direct relay operation.")
+
+
+class DirectRelay:
+    def __init__(self, state=None):
+        self.state = state
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def close(self):
+        return None
+
+    def relay(
+        self,
+        service: str,
+        operation: str,
+        parameters: dict,
+        *,
+        query: str = "",
+        headers: dict[str, str] | None = None,
+        body: str | None = None,
+        max_bytes: int = 2_000_000,
+    ):
+        method, url = direct_target(service, operation, parameters, query)
+        session = self.state.session if self.state is not None else requests.Session()
+        request_headers = headers or {}
+        prepared = session.prepare_request(
+            requests.Request(
+                method,
+                url,
+                headers=request_headers,
+                data=body,
+            )
+        )
+        try:
+            response = session.send(
+                prepared,
+                stream=True,
+                timeout=_direct_timeout(),
+                allow_redirects=True,
+            )
+        except requests.RequestException:
+            if self.state is None:
+                session.close()
+            raise BridgeError(
+                "direct_transport_error",
+                "Direct destination request failed.",
+            ) from None
+        try:
+            raw = response.raw.read(max_bytes + 1, decode_content=True) or b""
+            truncated = len(raw) > max_bytes
+            raw = raw[:max_bytes]
+            content_type = response.headers.get(
+                "Content-Type", "application/octet-stream"
+            )
+            text = raw.decode("utf-8", errors="replace")
+            result = {
+                "ok": 200 <= response.status_code < 300,
+                "bridge_ok": False,
+                "transport": "direct",
+                "service": service,
+                "operation": operation,
+                "upstream_http": response.status_code,
+                "content_type": content_type,
+                "body": text,
+                "body_truncated": truncated,
+                "_set_cookies": [],
+            }
+            if not result["ok"]:
+                result["error"] = "upstream_http"
+            if "json" in content_type.lower() and not truncated:
+                try:
+                    result["json"] = json.loads(text)
+                except ValueError:
+                    pass
+            return result
+        finally:
+            response.close()
+            if self.state is None:
+                session.close()
+
+
+def relay(
+    config,
+    state,
+    service: str,
+    operation: str,
+    parameters: dict,
+    *,
+    query: str = "",
+    headers: dict[str, str] | None = None,
+    body: str | None = None,
+    max_bytes: int = 2_000_000,
+):
+    if config is None:
+        return DirectRelay(state).relay(
+            service,
+            operation,
+            parameters,
+            query=query,
+            headers=headers,
+            body=body,
+            max_bytes=max_bytes,
+        )
+    with WorkersClient(config) as client:
+        return client.relay(
+            service,
+            operation,
+            parameters,
+            query=query,
+            headers=headers,
+            body=body,
+            max_bytes=max_bytes,
+        )
 
 
 class CookieState:
@@ -159,10 +330,15 @@ def x_home(config, headers: dict[str, str] | None = None, max_bytes: int = 2_000
         request_headers = state.headers(
             "https://x.com/home", _x_headers(headers)
         )
-        with WorkersClient(config) as client:
-            result = client.relay(
-                "x", "home", {}, headers=request_headers, max_bytes=max_bytes
-            )
+        result = relay(
+            config,
+            state,
+            "x",
+            "home",
+            {},
+            headers=request_headers,
+            max_bytes=max_bytes,
+        )
         state.consume(result, "https://x.com/home")
         return result
     finally:
@@ -192,15 +368,16 @@ def x_graphql(
     state = CookieState("x")
     try:
         request_headers = state.headers(url, _x_headers(headers))
-        with WorkersClient(config) as client:
-            result = client.relay(
-                "x",
-                "graphql",
-                {"queryId": query_id, "operationName": operation_name},
-                query=query,
-                headers=request_headers,
-                max_bytes=max_bytes,
-            )
+        result = relay(
+            config,
+            state,
+            "x",
+            "graphql",
+            {"queryId": query_id, "operationName": operation_name},
+            query=query,
+            headers=request_headers,
+            max_bytes=max_bytes,
+        )
         state.consume(result, url)
         return result
     finally:
@@ -217,14 +394,15 @@ def x_asset(
         raise BridgeError("invalid_argument", "Invalid X client asset name.")
     request_headers = _x_headers(headers)
     request_headers.pop("Cookie", None)
-    with WorkersClient(config) as client:
-        result = client.relay(
-            "x",
-            "asset",
-            {"asset": asset},
-            headers=request_headers,
-            max_bytes=max_bytes,
-        )
+    result = relay(
+        config,
+        None,
+        "x",
+        "asset",
+        {"asset": asset},
+        headers=request_headers,
+        max_bytes=max_bytes,
+    )
     result.pop("_set_cookies", None)
     return result
 
@@ -238,10 +416,15 @@ def reddit_identity(
     try:
         url = "https://old.reddit.com/api/me.json"
         request_headers = state.headers(url, _reddit_headers(headers))
-        with WorkersClient(config) as client:
-            result = client.relay(
-                "reddit", "identity", {}, headers=request_headers, max_bytes=max_bytes
-            )
+        result = relay(
+            config,
+            state,
+            "reddit",
+            "identity",
+            {},
+            headers=request_headers,
+            max_bytes=max_bytes,
+        )
         state.consume(result, url)
         return result
     finally:
@@ -266,14 +449,15 @@ def reddit_listing(
     state = CookieState("reddit")
     try:
         request_headers = state.headers(url, _reddit_headers(headers))
-        with WorkersClient(config) as client:
-            result = client.relay(
-                "reddit",
-                "listing",
-                {"account": account, "collection": collection, "after": after},
-                headers=request_headers,
-                max_bytes=max_bytes,
-            )
+        result = relay(
+            config,
+            state,
+            "reddit",
+            "listing",
+            {"account": account, "collection": collection, "after": after},
+            headers=request_headers,
+            max_bytes=max_bytes,
+        )
         state.consume(result, url)
         return result
     finally:
@@ -306,14 +490,15 @@ def reddit_comments(
             "https://old.reddit.com" + parsed.path, _reddit_headers(headers)
         )
         request_headers["Accept"] = "text/html"
-        with WorkersClient(config) as client:
-            result = client.relay(
-                "reddit",
-                "comments",
-                {"permalink": permalink},
-                headers=request_headers,
-                max_bytes=max_bytes,
-            )
+        result = relay(
+            config,
+            state,
+            "reddit",
+            "comments",
+            {"permalink": permalink},
+            headers=request_headers,
+            max_bytes=max_bytes,
+        )
         state.consume(result, "https://old.reddit.com" + parsed.path)
         return result
     finally:

@@ -14,7 +14,7 @@ from x_client_transaction import ClientTransaction
 
 from .config import WorkersConfig
 from .errors import BridgeError, UpstreamError
-from .social import CookieState, X_USER_AGENT
+from .social import CookieState, DirectRelay, X_USER_AGENT
 from .workers import WorkersClient
 
 
@@ -325,10 +325,12 @@ def parse_timeline(
 
 
 class XCollectionClient:
-    def __init__(self, config: WorkersConfig):
+    def __init__(self, config: WorkersConfig | None):
         self.config = config
         self.state = CookieState("x")
-        self.client = WorkersClient(config)
+        self.client = (
+            WorkersClient(config) if config is not None else DirectRelay(self.state)
+        )
         self.features: dict[str, bool] = {}
         self.operations: dict[str, dict[str, Any]] = {}
         self.account_id: str | None = None
@@ -680,7 +682,7 @@ class XCollectionClient:
 
 
 def collect_x_collection(
-    config: WorkersConfig,
+    config: WorkersConfig | None,
     collection: str,
     *,
     max_pages: int = 20,

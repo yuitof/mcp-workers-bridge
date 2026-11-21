@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -136,3 +137,77 @@ def test_x_asset_never_returns_origin_cookies(monkeypatch):
     monkeypatch.setattr(social, "WorkersClient", Client)
     result = social.x_asset(CONFIG, "main.synthetic.js")
     assert "auth_token=must-not-escape" not in str(result)
+
+
+def test_direct_target_maps_destinations():
+    assert social.direct_target("x", "home", {}, "") == (
+        "GET",
+        "https://x.com/home",
+    )
+    assert social.direct_target("x", "asset", {"asset": "main.js"}, "") == (
+        "GET",
+        "https://abs.twimg.com/responsive-web/client-web/main.js",
+    )
+    assert social.direct_target(
+        "reddit",
+        "listing",
+        {"account": "alice", "collection": "saved", "after": None},
+        "",
+    ) == (
+        "GET",
+        "https://old.reddit.com/user/alice/saved.json?limit=100&raw_json=1",
+    )
+    assert social.direct_target(
+        "reddit",
+        "comments",
+        {"permalink": "https://old.reddit.com/r/test/comments/abc123/title"},
+        "",
+    ) == (
+        "GET",
+        "https://old.reddit.com/r/test/comments/abc123/title/?context=0",
+    )
+    assert social.direct_target("youtube", "history", {}, "") == (
+        "GET",
+        "https://www.youtube.com/feed/history?hl=en",
+    )
+
+
+def test_direct_relay_returns_upstream_result():
+    class Raw:
+        def read(self, amount, decode_content=True):
+            return b'{"ok": true}'
+
+    class Response:
+        status_code = 200
+        headers = {"Content-Type": "application/json"}
+        raw = Raw()
+
+        def close(self):
+            pass
+
+    class Session:
+        prepared = None
+        sent = None
+
+        def prepare_request(self, request):
+            self.prepared = request
+            return request
+
+        def send(self, prepared, **kwargs):
+            self.sent = kwargs
+            return Response()
+
+    session = Session()
+    result = social.DirectRelay(SimpleNamespace(session=session)).relay(
+        "x",
+        "home",
+        {},
+        headers={"Cookie": "auth_token=synthetic"},
+    )
+
+    assert session.prepared.url == "https://x.com/home"
+    assert session.sent["allow_redirects"] is True
+    assert result["ok"] is True
+    assert result["transport"] == "direct"
+    assert result["bridge_ok"] is False
+    assert result["json"] == {"ok": True}

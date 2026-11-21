@@ -4,6 +4,7 @@ from typing import Any
 
 from mcp.server import MCPServer
 
+from .captions import direct_captions
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError
 from .social import (
@@ -29,16 +30,14 @@ mcp = MCPServer(
         "is true. workers_youtube_history uses only the authenticated YouTube account "
         "session through Workers and reports incomplete pagination as partial "
         "coverage. It can read the vault-compatible local/S3 cache; cached reads "
-        "set refresh=false."
+        "set refresh=false. When SERVICE_BRIDGE_WORKER_URL is unset, tools use "
+        "direct destination connections instead of the Workers relay."
     ),
 )
 
 
 def _workers():
-    config = WorkersConfig.from_env()
-    if config is None:
-        raise ConfigurationError("Cloudflare Workers bridge is not configured.")
-    return config
+    return WorkersConfig.from_env()
 
 
 @mcp.tool(
@@ -68,6 +67,7 @@ def bridge_configuration() -> dict[str, Any]:
             "error": str(error),
         }
     return {
+        "mode": "workers" if workers is not None else "direct",
         "workers": {
             "configured": workers is not None,
             "url": workers.base_url if workers else None,
@@ -86,8 +86,19 @@ def bridge_configuration() -> dict[str, Any]:
     ),
 )
 def workers_bridge_probe() -> dict[str, Any]:
+    config = _workers()
+    if config is None:
+        return {
+            "ok": False,
+            "error": "workers_not_configured",
+            "mode": "direct",
+            "message": (
+                "Cloudflare Workers bridge is not configured; direct transport "
+                "is active."
+            ),
+        }
     try:
-        with WorkersClient(_workers()) as client:
+        with WorkersClient(config) as client:
             return client.probe()
     except BridgeError as error:
         return error_result(error)
@@ -113,7 +124,10 @@ def workers_youtube_captions(
             "message": "max_segments must be between 1 and 20000.",
         }
     try:
-        with WorkersClient(_workers()) as client:
+        config = _workers()
+        if config is None:
+            return direct_captions(video_id, include_segments, max_segments)
+        with WorkersClient(config) as client:
             return client.captions(video_id, include_segments, max_segments)
     except BridgeError as error:
         return error_result(error)

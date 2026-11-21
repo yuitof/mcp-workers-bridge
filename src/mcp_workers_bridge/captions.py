@@ -221,6 +221,39 @@ class CaptionFlow(OriginRequestMixin):
                 **({"Content-Type": "application/json"} if body else {}),
             },
         )
+        if self.transport is None:
+            direct = self.prepared_origin(
+                "POST" if body else "GET",
+                url,
+                data=body,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept": "*/*",
+                    **(
+                        {"Content-Type": "application/json"}
+                        if body
+                        else {}
+                    ),
+                },
+            )
+            try:
+                response = self._cookie_session.send(
+                    direct,
+                    timeout=50,
+                    allow_redirects=True,
+                )
+            except requests.RequestException:
+                raise CaptionError(
+                    "direct_transport_error",
+                    "Direct YouTube request failed.",
+                ) from None
+            if response.status_code != 200:
+                status = response.status_code
+                response.close()
+                raise UpstreamError(name, status)
+            response.encoding = "utf-8"
+            return response
         response = self.transport.request(
             "POST",
             f"/v1/signed-out-comparison/{name}",
@@ -301,6 +334,33 @@ class CaptionFlow(OriginRequestMixin):
                 "Accept": "*/*",
             },
         )
+        if self.transport is None:
+            try:
+                caption = self._cookie_session.send(
+                    prepared,
+                    timeout=50,
+                    allow_redirects=True,
+                )
+            except requests.RequestException:
+                raise CaptionError(
+                    "direct_transport_error",
+                    "Direct timedtext request failed.",
+                ) from None
+            try:
+                if caption.status_code != 200:
+                    raise UpstreamError("timedtext", caption.status_code)
+                caption.encoding = "utf-8"
+                segments = parse_segments(caption.text)
+            finally:
+                caption.close()
+            return {
+                "video_id": video_id,
+                "language": track["languageCode"],
+                "caption_type": (
+                    "automatic" if track.get("kind") == "asr" else "manual"
+                ),
+                "segments": segments,
+            }
         caption = self.transport.request(
             "POST",
             "/v1/signed-out-comparison/timedtext",
@@ -336,3 +396,26 @@ class CaptionFlow(OriginRequestMixin):
             "caption_type": "automatic" if track.get("kind") == "asr" else "manual",
             "segments": segments,
         }
+
+
+def direct_captions(
+    video_id: str,
+    include_segments: bool,
+    max_segments: int,
+):
+    flow = CaptionFlow(None)
+    try:
+        result = flow.fetch(video_id)
+    finally:
+        flow.close_origin()
+    segments = result["segments"]
+    return {
+        "ok": True,
+        "video_id": video_id,
+        "language": result["language"],
+        "caption_type": result["caption_type"],
+        "segment_count": len(segments),
+        "segments": segments[:max_segments] if include_segments else [],
+        "segments_truncated": include_segments and len(segments) > max_segments,
+        "transport": "direct",
+    }

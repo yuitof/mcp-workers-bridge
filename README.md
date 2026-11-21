@@ -54,6 +54,14 @@ export X_STORAGE_STATE_JSON='...'
 export REDDIT_STORAGE_STATE_JSON='...'
 ```
 
+`SERVICE_BRIDGE_WORKER_URL` and the Access pair are optional. When all three
+are absent, the MCP runs in direct mode and connects to the destination hosts
+directly with the supplied storage-state sessions. `bridge_configuration`
+reports `mode = "direct"`, and `workers_bridge_probe` reports
+`workers_not_configured`. The direct X, Reddit, and YouTube sessions set
+`trust_env = False`, so `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` do not
+apply to them.
+
 In Codex Cloud, configure `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` as environment-owned HTTP secrets scoped to the exact Worker hostname. Keep the inherited HTTPS proxy active. On a local Mac, load the actual service-token values privately and exclude the Worker hostname from the local proxy only when your setup requires that route.
 
 The URL configuration accepts `SERVICE_BRIDGE_WORKER_URL` and the shorter `WORKERS_BRIDGE_URL` alias.

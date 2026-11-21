@@ -1,4 +1,4 @@
-"""Authenticated YouTube watch-history retrieval through the Workers relay."""
+"""Authenticated YouTube watch-history retrieval through Workers or directly."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from requests.cookies import MockRequest, MockResponse
 
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError, UpstreamError
+from .social import DirectRelay
 from .workers import WorkersClient
 from .youtube_cache import CacheManager, now
 
@@ -418,7 +419,7 @@ class YouTubeCookieState:
 
 
 def relay_history(
-    client: WorkersClient,
+    client,
     state: YouTubeCookieState,
     operation: str,
     *,
@@ -768,8 +769,6 @@ def youtube_history(
             manager,
             refresh=False,
         )
-    if config is None:
-        raise ConfigurationError("Cloudflare Workers bridge is not configured.")
     state = YouTubeCookieState()
     observations: dict[tuple[str, str], dict[str, Any]] = {}
     unknown: set[str] = set()
@@ -836,7 +835,10 @@ def youtube_history(
                 }
 
     try:
-        with WorkersClient(config) as client:
+        transport = (
+            WorkersClient(config) if config is not None else DirectRelay(state)
+        )
+        with transport as client:
             bootstrap_headers = state.headers(
                 "GET",
                 HISTORY_URL,
