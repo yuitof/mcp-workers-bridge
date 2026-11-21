@@ -15,7 +15,7 @@ def test_project_mcp_definition_uses_cloud_safe_launcher():
     assert "git rev-parse --show-toplevel" in server["args"][1]
     assert "git fetch origin main" in server["args"][1]
     assert "git merge --ff-only origin/main" in server["args"][1]
-    assert "bash \"$root/.codex/setup.sh\"" in server["args"][1]
+    assert "bash \"$root/.codex/setup.sh\"" not in server["args"][1]
     assert server["args"][1].endswith(
         'exec "$root/.venv/bin/mcp-workers-bridge"'
     )

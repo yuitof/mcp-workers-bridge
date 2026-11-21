@@ -21,10 +21,11 @@ are ignored for untrusted projects. Trust registration replaces
 containing Codex home directory is writable.
 
 The MCP launcher refreshes the checkout before every startup: it fast-forwards
-`origin/main`, runs `.codex/setup.sh`, and only then starts the MCP server.
-Bootstrap and setup output is written to stderr so it cannot interfere with the
-MCP JSON stream. Codex sends its normal MCP initialization request after the
-launcher transfers control to `.venv/bin/mcp-workers-bridge`.
+`origin/main` and then starts the MCP server. `.codex/setup.sh` is not run by
+the launcher and must be run manually when dependencies or project trust need
+to be updated. Bootstrap output is written to stderr so it cannot interfere
+with the MCP JSON stream. Codex sends its normal MCP initialization request
+after the launcher transfers control to `.venv/bin/mcp-workers-bridge`.
 
 Setup also merges the project MCP table into the user-level
 `$CODEX_HOME/config.toml` once. The injected block is marked with

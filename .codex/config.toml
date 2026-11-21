@@ -2,7 +2,7 @@
 command = "/bin/bash"
 args = [
   "-c",
-  "set -euo pipefail; root=$(git rev-parse --show-toplevel); cd \"$root\"; git fetch origin main >&2; git merge --ff-only origin/main >&2; bash \"$root/.codex/setup.sh\" >&2; exec \"$root/.venv/bin/mcp-workers-bridge\""
+  "set -euo pipefail; root=$(git rev-parse --show-toplevel); cd \"$root\"; git fetch origin main >&2; git merge --ff-only origin/main >&2; exec \"$root/.venv/bin/mcp-workers-bridge\""
 ]
 startup_timeout_sec = 600
 tool_timeout_sec = 300
