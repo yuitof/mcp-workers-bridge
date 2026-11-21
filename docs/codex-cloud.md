@@ -9,8 +9,15 @@ and complete the setup phase before the stdio MCP process starts.
 Set the Cloud environment's install script to:
 
 ```bash
-bash .codex/setup.sh
+bash /workspace/mcp-workers-bridge/.codex/setup.sh
 ```
+
+Run setup with elevated sandbox permissions. It writes outside the checkout:
+the package-manager caches and `$CODEX_HOME/config.toml`, which carries the
+project trust entry and MCP server definition. A sandbox limited to workspace
+writes cannot complete those writes. In Codex Cloud the install-script phase
+runs inside the environment container; for Codex CLI use
+`--sandbox danger-full-access` or approve the escalation.
 
 The script installs the locked Python environment and Worker npm dependencies.
 It does not collect history, read cookies, invoke the Worker, or deploy
