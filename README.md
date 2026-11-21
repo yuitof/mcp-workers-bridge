@@ -7,6 +7,9 @@ This repository contains both halves of the Access-protected service bridge:
 - `src/mcp_workers_bridge/`: the Python stdio MCP client.
 - `infra/service-bridge-workers/`: the Cloudflare Worker source, tests, build configuration, Terraform, and deployment runbook.
 
+The stdio server is dual-era: the same executable supports modern
+`2026-07-28` requests and legacy `2025-11-25` initialization-based clients.
+
 The server does not contain Cloudflare Access secrets, AWS credentials, cookies, transcripts, or cache data.
 
 ## Repository setup

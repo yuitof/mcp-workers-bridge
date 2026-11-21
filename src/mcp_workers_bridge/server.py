@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from .config import WorkersConfig
 from .errors import BridgeError, ConfigurationError
@@ -20,7 +20,7 @@ from .workers import WorkersClient, error_result
 from .x_collections import collect_x_collection
 
 
-mcp = FastMCP(
+mcp = MCPServer(
     "Workers Bridge",
     instructions=(
         "Use workers_bridge_probe before authenticated or public network reads. "

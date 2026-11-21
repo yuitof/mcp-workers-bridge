@@ -1,26 +1,68 @@
 import asyncio
+import sys
+from pathlib import Path
 
 import pytest
+from mcp import Client, StdioServerParameters
 
 from mcp_workers_bridge import server
 
 
-def test_server_exposes_expected_tools():
-    tools = asyncio.run(server.mcp.list_tools())
-    assert {tool.name for tool in tools} == {
-        "bridge_configuration",
-        "workers_bridge_probe",
-        "workers_reddit_comments",
-        "workers_reddit_identity",
-        "workers_reddit_listing",
-        "workers_x_asset",
-        "workers_x_bookmarks",
-        "workers_x_graphql",
-        "workers_x_home",
-        "workers_x_likes",
-        "workers_youtube_captions",
-        "workers_youtube_history",
-    }
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_TOOL_NAMES = {
+    "bridge_configuration",
+    "workers_bridge_probe",
+    "workers_reddit_comments",
+    "workers_reddit_identity",
+    "workers_reddit_listing",
+    "workers_x_asset",
+    "workers_x_bookmarks",
+    "workers_x_graphql",
+    "workers_x_home",
+    "workers_x_likes",
+    "workers_youtube_captions",
+    "workers_youtube_history",
+}
+
+
+def test_server_supports_legacy_and_modern_clients():
+    async def verify():
+        for mode, protocol_version in (
+            ("legacy", "2025-11-25"),
+            ("auto", "2026-07-28"),
+        ):
+            async with Client(server.mcp, mode=mode) as client:
+                assert client.protocol_version == protocol_version
+                tools = await client.list_tools()
+                assert {tool.name for tool in tools.tools} == EXPECTED_TOOL_NAMES
+                result = await client.call_tool("bridge_configuration")
+                assert result.is_error is False
+                assert "workers" in result.structured_content
+
+    asyncio.run(verify())
+
+
+def test_stdio_server_supports_both_protocol_revisions():
+    stdio_server = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "mcp_workers_bridge"],
+        cwd=PROJECT_ROOT,
+    )
+
+    async def verify():
+        for mode, protocol_version in (
+            ("legacy", "2025-11-25"),
+            ("auto", "2026-07-28"),
+        ):
+            async with Client(stdio_server, mode=mode) as client:
+                assert client.protocol_version == protocol_version
+                tools = await client.list_tools()
+                assert {tool.name for tool in tools.tools} == EXPECTED_TOOL_NAMES
+                result = await client.call_tool("bridge_configuration")
+                assert result.is_error is False
+                assert "workers" in result.structured_content
+
+    asyncio.run(verify())
 
 
 def test_bridge_configuration_does_not_reveal_credentials(monkeypatch):
