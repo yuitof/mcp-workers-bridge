@@ -15,10 +15,19 @@ relay configuration is covered in [docs/manual.md](docs/manual.md).
 - Chrome signed in to the services you want to read, in the profile you will
   export from.
 
-## 1. Extract cookies from Chrome
+## 1. Extract cookies and set the environment variables
 
 Cookies are full account credentials. Keep the values private, never commit
 them, and never paste them into chat.
+
+Direct mode needs only the storage-state variable for each service you use:
+
+| Data | Minimum variable |
+| --- | --- |
+| YouTube history | `YOUTUBE_STORAGE_STATE_JSON` |
+| X | `X_STORAGE_STATE_JSON` |
+| Reddit | `REDDIT_STORAGE_STATE_JSON` |
+| YouTube captions only | none |
 
 ### Option A: bundled exporter (macOS)
 
@@ -40,54 +49,20 @@ export REDDIT_STORAGE_STATE_JSON="$(
 )"
 ```
 
-### Use the published PyPI package
-
-Run the server without cloning:
-
-```bash
-uvx mcp-workers-bridge
-```
-
-Or install it persistently:
-
-```bash
-uv tool install mcp-workers-bridge
-# or
-pipx install mcp-workers-bridge
-```
-
-The package page is
-[pypi.org/project/mcp-workers-bridge](https://pypi.org/project/mcp-workers-bridge/).
-To download the wheel and source archive without installing, use **Download
-files** on that page, or:
-
-```bash
-python -m pip download mcp-workers-bridge --no-deps -d dist
-```
-
-Versions before 0.6.0 do not include the `chrome-storage-state` exporter. For
-a repository checkout, run `uv sync --system-certs --extra cookies` and replace
-each `uvx ... chrome-storage-state` command above with
-`.venv/bin/chrome-storage-state`.
-
-`Default` is Chrome's first profile. The directory name depends on the person
-and browser setup; list `~/Library/Application Support/Google/Chrome/` and pass
-the profile that is signed in (for example `--profile "Profile 1"`).
-
-The exporter reads the "Chrome Safe Storage" key from Keychain (macOS may ask
-for permission once), copies the cookie database to a temporary directory,
-decrypts matching cookies, and prints storage-state JSON with `--stdout`. Use
-`--output PATH` instead if you prefer a private mode-600 file. `--chrome-root`
-can point at a non-default Chrome installation.
-
 ### Option B: Chrome DevTools (any platform)
 
 1. Open Chrome, then **View > Developer > Developer Tools**.
 2. Open the **Application** tab, then **Storage > Cookies**.
 3. Select `https://www.youtube.com`, `https://x.com`, or
    `https://old.reddit.com`.
-4. Copy the required names and values into a JSON object for the environment
-   variable in step 2:
+4. Copy the required names and values, build the storage-state JSON, and assign
+   it directly to the matching environment variable:
+
+```bash
+export YOUTUBE_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
+export X_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
+export REDDIT_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
+```
 
 ```json
 {
@@ -115,43 +90,9 @@ Required cookies per service:
 
 YouTube captions for public videos do not need a session.
 
-## 2. Set the environment variables
+## 2. Register with Codex CLI
 
-Direct mode needs only the storage-state variable for each service you use:
-
-| Data | Minimum variable |
-| --- | --- |
-| YouTube history | `YOUTUBE_STORAGE_STATE_JSON` |
-| X | `X_STORAGE_STATE_JSON` |
-| Reddit | `REDDIT_STORAGE_STATE_JSON` |
-| YouTube captions only | none |
-
-If you used the exporter in step 1, the variables are already set for that
-shell; rerun those export commands in a new shell. If you used DevTools, assign
-the JSON objects directly:
-
-```bash
-export YOUTUBE_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
-export X_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
-export REDDIT_STORAGE_STATE_JSON='{"cookies":[...],"origins":[]}'
-```
-
-## 3. Register with Codex CLI
-
-### Option A: use the project config
-
-Trust this checkout in `~/.codex/config.toml`:
-
-```toml
-[projects."/path/to/mcp-workers-bridge"]
-trust_level = "trusted"
-```
-
-Then run `codex` from anywhere inside the checkout. The project-scoped
-`.codex/config.toml` defines the MCP server entry and forwards the variables
-listed above.
-
-### Option B: register a user-level server
+### Register a user-level server
 
 Recommended PyPI registration:
 
@@ -162,31 +103,6 @@ codex mcp add workers-bridge -- uvx mcp-workers-bridge
 Codex stores `uvx` as the command with `mcp-workers-bridge` as its argument and
 runs the published package on demand.
 
-For a repository install instead:
-
-```bash
-cd /path/to/mcp-workers-bridge
-codex mcp add workers-bridge -- "$(pwd)/.venv/bin/mcp-workers-bridge"
-```
-
-Add the environment pass-through list to the entry in `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.workers-bridge]
-command = "uvx"
-args = ["mcp-workers-bridge"]
-env_vars = [
-  "YOUTUBE_STORAGE_STATE_JSON",
-  "YOUTUBE_TIMEZONE",
-  "YOUTUBE_CACHE_DIR",
-  "X_STORAGE_STATE_JSON",
-  "REDDIT_STORAGE_STATE_JSON",
-  "UV_SYSTEM_CERTS"
-]
-```
-
-For a repository install, use the repository `.venv` path as `command`.
-
 Restart Codex after changing the config, then verify:
 
 ```bash
@@ -194,7 +110,7 @@ codex mcp list
 codex mcp get workers-bridge
 ```
 
-## 4. Verify the connection
+## 3. Verify the connection
 
 In a Codex CLI session, run `/mcp` and confirm the server is connected. Then:
 
